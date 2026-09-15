@@ -7,7 +7,7 @@ export type InviteAcceptanceResult = {
     outcome: 'added' | 'duplicate'
 }
 
-export interface InviteDatabase<OutboundPayload, InboundPayload> {
+export interface IInviteDatabase<OutboundPayload, InboundPayload> {
     upsertOutbound(invite: OutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InboundInvite<InboundPayload>): Promise<void>
 
@@ -18,7 +18,7 @@ export interface InviteDatabase<OutboundPayload, InboundPayload> {
     getAllActiveInbound(): AsyncIterator<InboundInvite<InboundPayload>>
 };
 
-export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements InviteDatabase<OutboundPayload, InboundPayload> {
+export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<OutboundPayload, InboundPayload> {
     private inboundInviteCodec: Codec<InboundInvite<InboundPayload>>;
     private outboundInviteCodec: Codec<OutboundInvite<OutboundPayload>>;
     private privateHyperbee: Hyperbee;
@@ -68,7 +68,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements Inv
         const encodedRecord = encode(this.outboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
-        await this.privateHyperbee.put(inviteKey, encodedRecord),
+        await this.privateHyperbee.put(inviteKey, encodedRecord)
     }
 
     async *getAllActiveOutbound(): AsyncGenerator<OutboundInvite<OutboundPayload>> {
