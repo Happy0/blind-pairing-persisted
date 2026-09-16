@@ -8,23 +8,20 @@ import {string} from 'compact-encoding/index.js'
 import { encode, type Codec } from "compact-encoding";
 import b4a from 'b4a';
 
-export type OutboundInvite = {
-     invite: Uint8Array
-}
-
-export type InboundInvite = {
-    invite: Uint8Array
+export type Invite = {
+     invite: Uint8Array,
+     purpose: string
 }
 
 export interface IInviteManager<InboundPayload, OutboundPayload> {
     createInvite(
-        discoveryKey: Uint8Array,
+        key: Uint8Array,
         purpose: string,
         count: number,
         expiresMillisSinceEpoch: number | null,
-        payload: OutboundPayload): Promise<OutboundInvite>;
+        payload: OutboundPayload): Promise<Invite>;
 
-    useInvite(InboundInvite: InboundInvite): Promise<void>;
+    useInvite(InboundInvite: Invite): Promise<void>;
 
     deleteInvite(inviteId: string): Promise<void>;
 }
@@ -69,13 +66,13 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     }
 
     async createInvite(
-        discoveryKey: Uint8Array,
+        key: Uint8Array,
         purpose: string,
         count: number,
         expiresMillisSinceEpoch: number | null, 
         payload: OutboundPayload): Promise<InternalOutboundInvite<OutboundPayload>> {
                 
-        const invite = BlindPairing.createInvite(discoveryKey, {
+        const invite = BlindPairing.createInvite(key, {
             data: encode(string, purpose)
         })
 
@@ -85,7 +82,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
             count: count,
             createdAtMillisSinceEpoch: Date.now(),
             direction: 'outbound',
-            discoveryKey: discoveryKey,
+            discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
             extraData: payload,
             invite: invite.invite,
@@ -101,7 +98,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         return outboundInvite;
     }
     
-    useInvite(invite: InboundInvite): Promise<void> {
+    useInvite(invite: Invite): Promise<void> {
         throw new Error("Method not implemented.");
     }
 
@@ -132,7 +129,6 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     }
 
     override async _close(): Promise<void> {
-
         const resources = [
                 ...Object.values(this.members),
                 ...Object.values(this.candidates)
@@ -142,5 +138,4 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
             resources.map(resource => resource.close())
         )
     }
-
 }
