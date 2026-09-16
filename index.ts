@@ -3,6 +3,7 @@ import BlindPairing from 'blind-pairing';
 
 function testaroonie() {
 
-    BlindPairing.createInvite()
+    const x = new BlindPairing(null)
+
 
 }

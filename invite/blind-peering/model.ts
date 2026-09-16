@@ -3,7 +3,7 @@ import {uint, uint8, string, buffer, fixed32} from 'compact-encoding/index.js'
 
 export type InviteId = string;
 
-export type OutboundInvite<Payload> = {
+export type InternalOutboundInvite<Payload> = {
     direction: 'outbound',
     purpose: string,
     inviteId: InviteId,
@@ -14,10 +14,10 @@ export type OutboundInvite<Payload> = {
     count: number | null,
     remaining: number | null,
     expiresMillisSinceEpoch: number | null,
-    payload: Payload
+    extraData: Payload
 }
 
-export type InboundInvite<Payload> = {
+export type InternalInboundInvite<Payload> = {
     direction: 'inbound',
     purpose: string,
     inviteId: InviteId,
@@ -36,7 +36,7 @@ const HAS_REMAINING = 4
 
 const STATUSES = ['pending', 'complete', 'failed'] as const
 
-const statusCodec: Codec<InboundInvite<unknown>['status']> = {
+const statusCodec: Codec<InternalInboundInvite<unknown>['status']> = {
     preencode: (state: State, value): void => {
         uint8.preencode(state, STATUSES.indexOf(value))
     },
@@ -45,7 +45,7 @@ const statusCodec: Codec<InboundInvite<unknown>['status']> = {
         if (index === -1) throw new Error(`Unknown invite status: ${value}`)
         uint8.encode(state, index)
     },
-    decode: (state: State): InboundInvite<unknown>['status'] => {
+    decode: (state: State): InternalInboundInvite<unknown>['status'] => {
         const index = uint8.decode(state)
         const status = STATUSES[index]
         if (status === undefined) throw new Error(`Unknown invite status index: ${index}`)
@@ -53,9 +53,9 @@ const statusCodec: Codec<InboundInvite<unknown>['status']> = {
     }
 }
 
-export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>): Codec<InboundInvite<Payload>> {
+export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>): Codec<InternalInboundInvite<Payload>> {
     return {
-        decode:(state: State): InboundInvite<Payload> => {
+        decode:(state: State): InternalInboundInvite<Payload> => {
             const flags = uint.decode(state)
 
             return {
@@ -70,7 +70,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
                 status: statusCodec.decode(state)
             }
         },
-        encode: (state: State, value: InboundInvite<Payload>): void => {
+        encode: (state: State, value: InternalInboundInvite<Payload>): void => {
             uint.encode(state, inboundFlags(value))
             string.encode(state, value.purpose)
             string.encode(state, value.inviteId)
@@ -81,7 +81,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
             buffer.encode(state, value.inviteCode)
             statusCodec.encode(state, value.status)
         },
-        preencode: (state: State, value: InboundInvite<Payload>): void => {
+        preencode: (state: State, value: InternalInboundInvite<Payload>): void => {
             uint.preencode(state, inboundFlags(value))
             string.preencode(state, value.purpose)
             string.preencode(state, value.inviteId)
@@ -95,9 +95,9 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
     }
 }
 
-export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>): Codec<OutboundInvite<Payload>> {
+export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>): Codec<InternalOutboundInvite<Payload>> {
     return {
-        decode:(state: State): OutboundInvite<Payload> => {
+        decode:(state: State): InternalOutboundInvite<Payload> => {
             const flags = uint.decode(state)
 
             return {
@@ -111,10 +111,10 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
                 count: (flags & HAS_COUNT) ? uint.decode(state) : null,
                 remaining: (flags & HAS_REMAINING) ? uint.decode(state) : null,
                 expiresMillisSinceEpoch: (flags & HAS_EXPIRES) ? uint.decode(state) : null,
-                payload: payloadCodec.decode(state)
+                extraData: payloadCodec.decode(state)
             }
         },
-        encode: (state: State, value: OutboundInvite<Payload>): void => {
+        encode: (state: State, value: InternalOutboundInvite<Payload>): void => {
             uint.encode(state, outboundFlags(value))
             string.encode(state, value.purpose)
             string.encode(state, value.inviteId)
@@ -125,9 +125,9 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             if (value.count !== null) uint.encode(state, value.count)
             if (value.remaining !== null) uint.encode(state, value.remaining)
             if (value.expiresMillisSinceEpoch !== null) uint.encode(state, value.expiresMillisSinceEpoch)
-            payloadCodec.encode(state, value.payload)
+            payloadCodec.encode(state, value.extraData)
         },
-        preencode: (state: State, value: OutboundInvite<Payload>): void => {
+        preencode: (state: State, value: InternalOutboundInvite<Payload>): void => {
             uint.preencode(state, outboundFlags(value))
             string.preencode(state, value.purpose)
             string.preencode(state, value.inviteId)
@@ -138,16 +138,16 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             if (value.count !== null) uint.preencode(state, value.count)
             if (value.remaining !== null) uint.preencode(state, value.remaining)
             if (value.expiresMillisSinceEpoch !== null) uint.preencode(state, value.expiresMillisSinceEpoch)
-            payloadCodec.preencode(state, value.payload)
+            payloadCodec.preencode(state, value.extraData)
         }
     }
 }
 
-function inboundFlags(value: InboundInvite<unknown>): number {
+function inboundFlags(value: InternalInboundInvite<unknown>): number {
     return value.expiresMillisSinceEpoch !== null ? HAS_EXPIRES : 0
 }
 
-function outboundFlags(value: OutboundInvite<unknown>): number {
+function outboundFlags(value: InternalOutboundInvite<unknown>): number {
     return (value.expiresMillisSinceEpoch !== null ? HAS_EXPIRES : 0) |
         (value.count !== null ? HAS_COUNT : 0) |
         (value.remaining !== null ? HAS_REMAINING : 0)

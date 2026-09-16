@@ -18,6 +18,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "b4a": "^1.9.0",
     "blind-pairing": "^2.3.1",
     "corestore": "^7.12.5",
     "hyperbee": "^2.27.3",

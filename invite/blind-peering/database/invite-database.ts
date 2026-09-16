@@ -1,6 +1,6 @@
 import type { Codec } from "compact-encoding"
 import {encode, decode, string} from 'compact-encoding/index.js'
-import { type OutboundInvite, type InboundInvite, createOutboundInviteCodec, createInboundInviteCodec } from "../model.js"
+import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec } from "../model.js"
 import Hyperbee from "hyperbee"
 
 export type InviteAcceptanceResult = {
@@ -8,21 +8,21 @@ export type InviteAcceptanceResult = {
 }
 
 export interface IInviteDatabase<InboundPayload, OutboundPayload> {
-    upsertOutbound(invite: OutboundInvite<OutboundPayload>): Promise<void>
-    upsertInbound(invite: InboundInvite<InboundPayload>): Promise<void>
+    upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
+    upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
 
     deleteOutboundInvite(inviteId: string): Promise<void>
 
     addInviteAcceptance(outboundInviteId: string, sessionId: string): Promise<InviteAcceptanceResult>
     isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>;
 
-    getAllActiveOutbound(): AsyncIterable<OutboundInvite<OutboundPayload>>
-    getAllActiveInbound(): AsyncIterable<InboundInvite<InboundPayload>>
+    getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>
+    getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
-    private inboundInviteCodec: Codec<InboundInvite<InboundPayload>>;
-    private outboundInviteCodec: Codec<OutboundInvite<OutboundPayload>>;
+    private inboundInviteCodec: Codec<InternalInboundInvite<InboundPayload>>;
+    private outboundInviteCodec: Codec<InternalOutboundInvite<OutboundPayload>>;
     private privateHyperbee: Hyperbee;
 
     /**
@@ -71,7 +71,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         }
     }
 
-    async upsertInbound(invite: InboundInvite<InboundPayload>): Promise<void> {
+    async upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void> {
         const encodedRecord = encode(this.inboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
@@ -80,7 +80,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
 
-    async upsertOutbound(invite: OutboundInvite<OutboundPayload>): Promise<void> {
+    async upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void> {
         const encodedRecord = encode(this.outboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
@@ -89,7 +89,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
 
-    async *getAllActiveOutbound(): AsyncGenerator<OutboundInvite<OutboundPayload>> {
+    async *getAllActiveOutbound(): AsyncGenerator<InternalOutboundInvite<OutboundPayload>> {
         const inviteRange = getInviteRange('outbound')
 
         const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
@@ -104,7 +104,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         }
     }
 
-    async *getAllActiveInbound(): AsyncGenerator<InboundInvite<InboundPayload>> {
+    async *getAllActiveInbound(): AsyncGenerator<InternalInboundInvite<InboundPayload>> {
         const inviteRange = getInviteRange('inbound')
 
         const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
@@ -120,7 +120,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
     }
 }
 
-function getKey(invite: InboundInvite<unknown> | OutboundInvite<unknown>): string {
+function getKey(invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>): string {
     return `/invites/${invite.direction}/createdAt/${invite.createdAtMillisSinceEpoch}/${invite.inviteId}`
 }
 
@@ -132,7 +132,7 @@ function getKeyMappingKey(inviteId: string): string {
     return `/invite_key_mapping/${inviteId}`
 }
 
-function isNotExpired(invite: InboundInvite<unknown> | OutboundInvite<unknown>): Boolean {
+function isNotExpired(invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>): Boolean {
    return invite.expiresMillisSinceEpoch == null || invite.expiresMillisSinceEpoch > Date.now()
 }
 
