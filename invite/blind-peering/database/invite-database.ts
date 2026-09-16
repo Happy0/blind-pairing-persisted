@@ -25,8 +25,6 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
 
     getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
     getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
-
-    getActiveOutboundDiscoveryKeys(): AsyncIterable<Uint8Array>
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {

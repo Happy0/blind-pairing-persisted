@@ -107,7 +107,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         }
 
         await this.inviteDatabase.upsertOutbound(outboundInvite);
-        this.startOutboundInvite(outboundInvite);
+        this.listenForInviteAcceptance(outboundInvite);
 
         return outboundInvite;
     }
@@ -116,7 +116,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         throw new Error("Method not implemented.");
     }
 
-    private startOutboundInvite(invite: InternalOutboundInvite<OutboundPayload>): void {
+    private listenForInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>): void {
         const resource = this.multiplexedBlindPeering.addOutboundInviteHandler(invite.discoveryKey, invite.purpose, this.inviteDatabase, this.inviteUpdateHandler)
         this.outgoingInvites[invite.inviteId] = resource;
     }
