@@ -11,13 +11,16 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
     upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
 
-    deleteOutboundInvite(inviteId: string): Promise<void>
+    getOutboundInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | null>
+    getInboundInvite(inviteId: string): Promise<InternalInboundInvite<InboundPayload> | null>
+
+    deleteInvite(inviteId: string): Promise<void>
 
     addInviteAcceptance(outboundInviteId: string, sessionId: string): Promise<InviteAcceptanceResult>
     isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>;
 
-    getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>
     getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
+    getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
@@ -26,16 +29,57 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
     private privateHyperbee: Hyperbee;
 
     /**
-     * @param privateHyperbee A hyperbee database (not replicated) to store the invite. This should be a hyperbee sub-database to avoid conflicts.
+     * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
+     * @param purpose A unique string representing the purpose the invites managed by this database is for - used as the 'sub' for the database
      * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
      */
-    constructor(privateHyperbee: Hyperbee, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
+    constructor(privateHyperbee: Hyperbee, purpose: string, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
         this.inboundInviteCodec = createInboundInviteCodec(inboundCodec);
         this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
-        this.privateHyperbee = privateHyperbee;
+        this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
     }
 
-    async deleteOutboundInvite(inviteId: string): Promise<void> {
+    async getInboundInvite(inviteId: string): Promise<InternalInboundInvite<InboundPayload> | null> {
+        const mappingKey = getKeyMappingKey(inviteId);
+
+        const item = await this.privateHyperbee.get(mappingKey)
+
+        if (item === null) {
+            return null;
+        }
+
+        const invite = await this.privateHyperbee.get(item.value)
+
+        if (invite === null) {
+            return null;
+        }
+
+        const result = decode(this.inboundInviteCodec, invite.value);
+
+        return result;
+    }
+
+    async getOutboundInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | null> {
+        const mappingKey = getKeyMappingKey(inviteId);
+
+        const item = await this.privateHyperbee.get(mappingKey)
+
+        if (item === null) {
+            return null;
+        }
+
+        const invite = await this.privateHyperbee.get(item.value)
+
+        if (invite === null) {
+            return null;
+        }
+
+        const result = decode(this.outboundInviteCodec, invite.value);
+
+        return result;
+    }
+
+    async deleteInvite(inviteId: string): Promise<void> {
         const mappingKey = getKeyMappingKey(inviteId);
 
         const item = await this.privateHyperbee.get(mappingKey)
@@ -89,22 +133,18 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
 
-    async *getAllActiveOutbound(): AsyncGenerator<InternalOutboundInvite<OutboundPayload>> {
-        const inviteRange = getInviteRange('outbound')
+    async *getAllActiveInbound(): AsyncGenerator<InternalInboundInvite<InboundPayload>> {
+        const stream = this.getAllInbound();
 
-        const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
+        for await (const item of stream) {
 
-        for await (const entry of stream) {
-            const encodedValue = (entry as any).value;
-            const item = decode(this.outboundInviteCodec, encodedValue)
-
-            if ( (!item.remaining || item.remaining > 0) && isNotExpired(item)) {
+            if (isNotExpired(item) && item.status !== 'complete' || item.status !== 'failed') {
                 yield item;
             }
         }
     }
 
-    async *getAllActiveInbound(): AsyncGenerator<InternalInboundInvite<InboundPayload>> {
+    async *getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>> {
         const inviteRange = getInviteRange('inbound')
 
         const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
@@ -118,6 +158,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
             }
         }
     }
+
 }
 
 function getKey(invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>): string {

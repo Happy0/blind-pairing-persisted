@@ -32,9 +32,6 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     private inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>;
     private blindPairing: BlindPairing;
 
-    private members: Record<InviteId, Member> = {};
-    private candidates: Record<InviteId, Candidate> = {};
-
     private inboundDataCodec: Codec<InboundPayload>;
     private outboundDataCodec: Codec<OutboundPayload>;
 
@@ -57,12 +54,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
-        await this.inviteDatabase.deleteOutboundInvite(inviteId);
-        const member = this.members[inviteId];
-
-        if (member) {
-            await member.close();
-        }
+        await this.inviteDatabase.deleteInvite(inviteId);
     }
 
     async createInvite(
@@ -93,7 +85,6 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         }
 
         await this.inviteDatabase.upsertOutbound(outboundInvite);
-        this.listenForInviteRedemptions(outboundInvite);
 
         return outboundInvite;
     }
@@ -105,37 +96,12 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     override async _open(): Promise<void> {
         // Grab all the persisted invites / invite acceptances from the database and add them to blindPairing as members / candidates
 
-        for await (const outboundInvite of this.inviteDatabase.getAllActiveOutbound()) {
-            this.listenForInviteRedemptions(outboundInvite);
-        }
+
 
         // TODO: also add the 'candidates'
     }
 
-    private listenForInviteRedemptions(outboundInvite: InternalOutboundInvite<OutboundPayload>): void {
-
-        const member = this.blindPairing.addMember({
-            discoveryKey: outboundInvite.discoveryKey,
-            async onadd(_candidate: Candidate) {
-                // TODO (robust): make pull request to holepunch types to expand Candidate type with fields available
-                const candidate = _candidate as unknown as any;
-
-                const payload = candidate.open(outboundInvite.publicKey)
-                
-            }
-        })
-
-        this.members[outboundInvite.inviteId] = member;
-    }
-
     override async _close(): Promise<void> {
-        const resources = [
-                ...Object.values(this.members),
-                ...Object.values(this.candidates)
-        ]
-
-        await Promise.all(
-            resources.map(resource => resource.close())
-        )
+ 
     }
 }
