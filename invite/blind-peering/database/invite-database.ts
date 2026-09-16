@@ -66,20 +66,6 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         }
     }
 
-    async *getActiveOutboundDiscoveryKeys(): AsyncIterable<Uint8Array> {
-        const alreadyOutput = new Set<string>();
-
-        // TODO (perf): some sort of index rather than iterating through all outbound
-        for await (const entry of this.getAllActiveOutbound()) {
-            const discoveryKeyHex = b4a.toString(entry.discoveryKey, 'hex');
-
-            if (!alreadyOutput.has(discoveryKeyHex)) {
-                alreadyOutput.add(discoveryKeyHex)
-                yield entry.discoveryKey
-            }
-        }
-    }
-
     async getInboundInvite(inviteId: string): Promise<InternalInboundInvite<InboundPayload> | null> {
         const mappingKey = getKeyMappingKey(inviteId);
 
