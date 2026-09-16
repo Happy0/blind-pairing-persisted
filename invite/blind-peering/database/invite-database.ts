@@ -2,6 +2,7 @@ import type { Codec } from "compact-encoding"
 import {encode, decode, string} from 'compact-encoding/index.js'
 import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec } from "../model.js"
 import Hyperbee from "hyperbee"
+import b4a from 'b4a'
 
 export type InviteAcceptanceResult = {
     outcome: 'added' | 'duplicate'
@@ -21,6 +22,11 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
 
     getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
     getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
+
+    getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
+    getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
+
+    getActiveOutboundDiscoveryKeys(): AsyncIterable<Uint8Array>
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
@@ -37,6 +43,42 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         this.inboundInviteCodec = createInboundInviteCodec(inboundCodec);
         this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
         this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
+    }
+
+    async *getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>> {
+        const stream = this.getAllOutbound();
+
+        for await (const entry of stream) {
+            if (isNotExpired(entry) && (entry.remaining === null || entry.remaining > 0)) {
+                yield entry;
+            }
+        }
+    }
+    async *getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>> {
+        const inviteRange = getInviteRange('outbound')
+
+        const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
+
+        for await (const entry of stream) {
+            const encodedValue = (entry as any).value;
+            const item = decode(this.outboundInviteCodec, encodedValue)
+
+            yield item;
+        }
+    }
+
+    async *getActiveOutboundDiscoveryKeys(): AsyncIterable<Uint8Array> {
+        const alreadyOutput = new Set<string>();
+
+        // TODO (perf): some sort of index rather than iterating through all outbound
+        for await (const entry of this.getAllActiveOutbound()) {
+            const discoveryKeyHex = b4a.toString(entry.discoveryKey, 'hex');
+
+            if (!alreadyOutput.has(discoveryKeyHex)) {
+                alreadyOutput.add(discoveryKeyHex)
+                yield entry.discoveryKey
+            }
+        }
     }
 
     async getInboundInvite(inviteId: string): Promise<InternalInboundInvite<InboundPayload> | null> {
