@@ -2,10 +2,10 @@ import ReadyResource from "ready-resource";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import type Hyperswarm from "hyperswarm";
-import type { OutboundInvite } from "./model.js";
+import type { InviteId, OutboundInvite } from "./model.js";
 import BlindPairing, { type Candidate, type Member } from "blind-pairing";
 
-export interface IInviteManager<OutboundPayload, InboundPayload> {
+export interface IInviteManager<InboundPayload, OutboundPayload> {
     createInvite(purpose: string, count: number, expiresMillisSinceEpoch: number | null): Promise<OutboundInvite<OutboundPayload>>;
 
     useInvite(invite: Uint8Array): Promise<void>;
@@ -13,17 +13,18 @@ export interface IInviteManager<OutboundPayload, InboundPayload> {
     deleteInvite(inviteId: string): Promise<void>;
 }
 
+export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResource implements IInviteManager<InboundPayload, OutboundPayload>  {
 
-export class InviteManager<OutboundPayload, InboundPayload> extends ReadyResource implements IInviteManager<OutboundPayload, InboundPayload>  {
-
-    private inviteUpdateHandler: InviteUpdateHandler<OutboundPayload, InboundPayload>;
-    private inviteDatabase: IInviteDatabase<OutboundPayload, InboundPayload>;
+    private inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>;
+    private inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>;
     private blindPairing: BlindPairing;
+
+    private members: Record<InviteId, Member> = {};
 
     constructor(
         hyperswarm: Hyperswarm,
-        inviteDatabase: IInviteDatabase<OutboundPayload, InboundPayload>,
-        inviteUpdateHandler: InviteUpdateHandler<OutboundPayload, InboundPayload>
+        inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>,
+        inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>
     ) {
         super();
 
@@ -31,8 +32,15 @@ export class InviteManager<OutboundPayload, InboundPayload> extends ReadyResourc
         this.inviteDatabase = inviteDatabase;
         this.blindPairing = new BlindPairing(hyperswarm);
     }
-    
-    deleteInvite(inviteId: string): Promise<void> {
+
+    async deleteInvite(inviteId: string): Promise<void> {
+        await this.inviteDatabase.deleteOutboundInvite(inviteId);
+        const member = this.members[inviteId];
+
+        if (member) {
+            await member.close();
+        }
+
         throw new Error("Method not implemented.");
     }
 
@@ -54,7 +62,7 @@ export class InviteManager<OutboundPayload, InboundPayload> extends ReadyResourc
         }
     }
 
-    private addMember(outboundInvite: OutboundInvite<OutboundPayload>): Member {
+    private addMember(outboundInvite: OutboundInvite<OutboundPayload>): void {
 
         const member = this.blindPairing.addMember({
             discoveryKey: outboundInvite.discoveryKey,
@@ -65,7 +73,7 @@ export class InviteManager<OutboundPayload, InboundPayload> extends ReadyResourc
             }
         })
 
-        return member;
+        this.members[outboundInvite.inviteId] = member;
     }
 
     override async _close(): Promise<void> {

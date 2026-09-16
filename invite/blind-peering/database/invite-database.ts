@@ -7,7 +7,7 @@ export type InviteAcceptanceResult = {
     outcome: 'added' | 'duplicate'
 }
 
-export interface IInviteDatabase<OutboundPayload, InboundPayload> {
+export interface IInviteDatabase<InboundPayload, OutboundPayload> {
     upsertOutbound(invite: OutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InboundInvite<InboundPayload>): Promise<void>
 
@@ -20,7 +20,7 @@ export interface IInviteDatabase<OutboundPayload, InboundPayload> {
     getAllActiveInbound(): AsyncIterable<InboundInvite<InboundPayload>>
 };
 
-export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<OutboundPayload, InboundPayload> {
+export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
     private inboundInviteCodec: Codec<InboundInvite<InboundPayload>>;
     private outboundInviteCodec: Codec<OutboundInvite<OutboundPayload>>;
     private privateHyperbee: Hyperbee;

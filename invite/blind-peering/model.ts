@@ -1,10 +1,12 @@
 import type { Codec, State } from "compact-encoding"
 import {uint, uint8, string, buffer, fixed32} from 'compact-encoding/index.js'
 
+export type InviteId = string;
+
 export type OutboundInvite<Payload> = {
     direction: 'outbound',
     purpose: string,
-    inviteId: string,
+    inviteId: InviteId,
     invite: Uint8Array,
     createdAtMillisSinceEpoch: number,
     publicKey: Uint8Array,
@@ -18,7 +20,7 @@ export type OutboundInvite<Payload> = {
 export type InboundInvite<Payload> = {
     direction: 'inbound',
     purpose: string,
-    inviteId: string,
+    inviteId: InviteId,
     invite: Uint8Array,
     createdAtMillisSinceEpoch: number,
     expiresMillisSinceEpoch: number | null,
