@@ -3,6 +3,7 @@ import {uint, uint8, string, buffer, fixed32} from 'compact-encoding/index.js'
 
 export type OutboundInvite<Payload> = {
     direction: 'outbound',
+    purpose: string,
     inviteId: string,
     invite: Uint8Array,
     createdAtMillisSinceEpoch: number,
@@ -16,6 +17,7 @@ export type OutboundInvite<Payload> = {
 
 export type InboundInvite<Payload> = {
     direction: 'inbound',
+    purpose: string,
     inviteId: string,
     invite: Uint8Array,
     createdAtMillisSinceEpoch: number,
@@ -56,6 +58,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
 
             return {
                 direction: 'inbound',
+                purpose: string.decode(state),
                 inviteId: string.decode(state),
                 invite: buffer.decode(state),
                 createdAtMillisSinceEpoch: uint.decode(state),
@@ -67,6 +70,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
         },
         encode: (state: State, value: InboundInvite<Payload>): void => {
             uint.encode(state, inboundFlags(value))
+            string.encode(state, value.purpose)
             string.encode(state, value.inviteId)
             buffer.encode(state, value.invite)
             uint.encode(state, value.createdAtMillisSinceEpoch)
@@ -77,6 +81,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
         },
         preencode: (state: State, value: InboundInvite<Payload>): void => {
             uint.preencode(state, inboundFlags(value))
+            string.preencode(state, value.purpose)
             string.preencode(state, value.inviteId)
             buffer.preencode(state, value.invite)
             uint.preencode(state, value.createdAtMillisSinceEpoch)
@@ -95,6 +100,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
 
             return {
                 direction: 'outbound',
+                purpose: string.decode(state),
                 inviteId: string.decode(state),
                 invite: buffer.decode(state),
                 createdAtMillisSinceEpoch: uint.decode(state),
@@ -108,6 +114,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
         },
         encode: (state: State, value: OutboundInvite<Payload>): void => {
             uint.encode(state, outboundFlags(value))
+            string.encode(state, value.purpose)
             string.encode(state, value.inviteId)
             buffer.encode(state, value.invite)
             uint.encode(state, value.createdAtMillisSinceEpoch)
@@ -120,6 +127,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
         },
         preencode: (state: State, value: OutboundInvite<Payload>): void => {
             uint.preencode(state, outboundFlags(value))
+            string.preencode(state, value.purpose)
             string.preencode(state, value.inviteId)
             buffer.preencode(state, value.invite)
             uint.preencode(state, value.createdAtMillisSinceEpoch)

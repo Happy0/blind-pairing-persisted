@@ -11,11 +11,13 @@ export interface IInviteDatabase<OutboundPayload, InboundPayload> {
     upsertOutbound(invite: OutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InboundInvite<InboundPayload>): Promise<void>
 
-    addInviteAcceptance(invite: OutboundInvite<OutboundPayload>, sessionId: string): Promise<InviteAcceptanceResult>
-    isAlreadyUsed(invite: OutboundInvite<OutboundPayload>, sessionId: string): Promise<boolean>;
+    deleteOutboundInvite(inviteId: string): Promise<void>
 
-    getAllActiveOutbound(): AsyncIterator<OutboundInvite<OutboundPayload>>
-    getAllActiveInbound(): AsyncIterator<InboundInvite<InboundPayload>>
+    addInviteAcceptance(outboundInviteId: string, sessionId: string): Promise<InviteAcceptanceResult>
+    isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>;
+
+    getAllActiveOutbound(): AsyncIterable<OutboundInvite<OutboundPayload>>
+    getAllActiveInbound(): AsyncIterable<InboundInvite<InboundPayload>>
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<OutboundPayload, InboundPayload> {
@@ -32,16 +34,28 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
         this.privateHyperbee = privateHyperbee;
     }
+
+    async deleteOutboundInvite(inviteId: string): Promise<void> {
+        const mappingKey = getKeyMappingKey(inviteId);
+
+        const item = await this.privateHyperbee.get(mappingKey)
+
+        if (item !== null) {
+            // TODO (robust): batch
+            await this.privateHyperbee.del(item.value);
+            await this.privateHyperbee.del(mappingKey);
+        }
+    }
     
-    async isAlreadyUsed(invite: OutboundInvite<OutboundPayload>, sessionId: string): Promise<boolean> {
-        const key = `${getKey(invite)}/sessionId/${sessionId}`
+    async isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean> {
+        const key = getInviteAcceptanceKey(outboundInviteId, sessionId)
         const existingItem = await this.privateHyperbee.get(key);
 
         return existingItem !== null;
     }
 
-    async addInviteAcceptance(invite: OutboundInvite<OutboundPayload>, sessionId: string): Promise<InviteAcceptanceResult> {
-        const key = `${getKey(invite)}/sessionId/${sessionId}`
+    async addInviteAcceptance(outboundInviteId: string, sessionId: string): Promise<InviteAcceptanceResult> {
+        const key = getInviteAcceptanceKey(outboundInviteId, sessionId);
         const existingItem = await this.privateHyperbee.get(key);
 
         if (existingItem === null) {
@@ -61,14 +75,18 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         const encodedRecord = encode(this.inboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
+        // TODO (perf): batch
         await this.privateHyperbee.put(inviteKey, encodedRecord)
+        await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
 
     async upsertOutbound(invite: OutboundInvite<OutboundPayload>): Promise<void> {
         const encodedRecord = encode(this.outboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
+        // TODO (perf): batch
         await this.privateHyperbee.put(inviteKey, encodedRecord)
+        await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
 
     async *getAllActiveOutbound(): AsyncGenerator<OutboundInvite<OutboundPayload>> {
@@ -86,7 +104,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         }
     }
 
-    async *getAllActiveInbound(): AsyncIterator<InboundInvite<InboundPayload>> {
+    async *getAllActiveInbound(): AsyncGenerator<InboundInvite<InboundPayload>> {
         const inviteRange = getInviteRange('inbound')
 
         const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
@@ -104,6 +122,14 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
 
 function getKey(invite: InboundInvite<unknown> | OutboundInvite<unknown>): string {
     return `/invites/${invite.direction}/createdAt/${invite.createdAtMillisSinceEpoch}/${invite.inviteId}`
+}
+
+function getInviteAcceptanceKey(inviteId: string, sessionId: string): string {
+    return `/invite_acceptance/${inviteId}/sessionId/${sessionId}`
+}
+
+function getKeyMappingKey(inviteId: string): string {
+    return `/invite_key_mapping/${inviteId}`
 }
 
 function isNotExpired(invite: InboundInvite<unknown> | OutboundInvite<unknown>): Boolean {

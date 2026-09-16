@@ -3,12 +3,14 @@ import type { IInviteDatabase } from "./database/invite-database.js";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import type Hyperswarm from "hyperswarm";
 import type { OutboundInvite } from "./model.js";
-import BlindPairing from "blind-pairing";
+import BlindPairing, { type Candidate, type Member } from "blind-pairing";
 
 export interface IInviteManager<OutboundPayload, InboundPayload> {
-    createInvite(count: number, expiresMillisSinceEpoch: number | null): Promise<OutboundInvite<OutboundPayload>>;
+    createInvite(purpose: string, count: number, expiresMillisSinceEpoch: number | null): Promise<OutboundInvite<OutboundPayload>>;
 
     useInvite(invite: Uint8Array): Promise<void>;
+
+    deleteInvite(inviteId: string): Promise<void>;
 }
 
 
@@ -29,8 +31,14 @@ export class InviteManager<OutboundPayload, InboundPayload> extends ReadyResourc
         this.inviteDatabase = inviteDatabase;
         this.blindPairing = new BlindPairing(hyperswarm);
     }
+    
+    deleteInvite(inviteId: string): Promise<void> {
+        throw new Error("Method not implemented.");
+    }
 
-    createInvite(count: number, expiresMillisSinceEpoch: number | null): Promise<OutboundInvite<OutboundPayload>> {
+    createInvite(purpose: string, count: number, expiresMillisSinceEpoch: number | null): Promise<OutboundInvite<OutboundPayload>> {
+        // const invite = BlindPairing.createInvite()
+
         throw new Error("Method not implemented.");
     }
     
@@ -41,7 +49,25 @@ export class InviteManager<OutboundPayload, InboundPayload> extends ReadyResourc
     override async _open(): Promise<void> {
         // Grab all the persisted invites / invite acceptances from the database and add them to blindPairing as members / candidates
 
+        for await (const outboundInvite of this.inviteDatabase.getAllActiveOutbound()) {
+            const member = this.addMember(outboundInvite);
+        }
     }
+
+    private addMember(outboundInvite: OutboundInvite<OutboundPayload>): Member {
+
+        const member = this.blindPairing.addMember({
+            discoveryKey: outboundInvite.discoveryKey,
+            // TODO (robust): make pull request to holepunch types to expand Candidate type with fields available
+            async onadd(candidate: any) {
+                const payload = candidate.open(outboundInvite.publicKey)
+                
+            }
+        })
+
+        return member;
+    }
+
     override async _close(): Promise<void> {
         // Close the member / candidates attached to blindPairing
 
