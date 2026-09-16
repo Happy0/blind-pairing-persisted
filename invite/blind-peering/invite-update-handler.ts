@@ -1,17 +1,17 @@
 import type { InternalInboundInvite, InternalOutboundInvite } from "./model.js";
 
 
-export interface InviteUpdateHandler<OutboundPayload, InboundPayload> {
+export interface InviteUpdateHandler<InboundPayload, OutboundPayload> {
 
     /**
      * Called when an invitee has accepted our invite.
      */
-    onInviteAccepted(invite: InternalOutboundInvite<OutboundPayload>, payload: OutboundPayload): Promise<void>;
+    onInviteAccepted(invite: InternalOutboundInvite<OutboundPayload>, payload: InboundPayload): Promise<void>;
 
     /**
      * Called when the inviter has confirmed that they have accepted our use of the invite.
      */
-    onInviteConfirmed(invite: InternalInboundInvite<InboundPayload>, payload: InboundPayload): Promise<void>;
+    onInviteConfirmed(invite: InternalInboundInvite<InboundPayload>, payload: OutboundPayload): Promise<void>;
 
     /**
      * Called when the invite has rejected our use of the invite (due to it already being used by another person, for example)

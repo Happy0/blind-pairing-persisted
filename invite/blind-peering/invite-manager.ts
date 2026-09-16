@@ -42,15 +42,22 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         outboundDataCodec: Codec<OutboundPayload>,
         inboundDataCodec: Codec<InboundPayload>
     ) {
-        super();
 
+        super();
         this.inviteUpdateHandler = inviteUpdateHandler;
         this.inviteDatabase = inviteDatabase;
         this.blindPairing = new BlindPairing(hyperswarm);
 
         this.inboundDataCodec = inboundDataCodec;
         this.outboundDataCodec = outboundDataCodec;
+    }
 
+    protected override _open(): Promise<void> {
+        throw new Error('wip')
+    }
+
+    protected override _close(): Promise<void> {
+        throw new Error('wip')
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
@@ -93,15 +100,4 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         throw new Error("Method not implemented.");
     }
 
-    override async _open(): Promise<void> {
-        // Grab all the persisted invites / invite acceptances from the database and add them to blindPairing as members / candidates
-
-
-
-        // TODO: also add the 'candidates'
-    }
-
-    override async _close(): Promise<void> {
- 
-    }
 }

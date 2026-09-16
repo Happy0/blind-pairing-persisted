@@ -36,13 +36,12 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
 
     /**
      * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
-     * @param purpose A unique string representing the purpose the invites managed by this database is for - used as the 'sub' for the database
      * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
      */
-    constructor(privateHyperbee: Hyperbee, purpose: string, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
+    constructor(privateHyperbee: Hyperbee, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
         this.inboundInviteCodec = createInboundInviteCodec(inboundCodec);
         this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
-        this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
+        this.privateHyperbee = privateHyperbee;
     }
 
     async *getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>> {
