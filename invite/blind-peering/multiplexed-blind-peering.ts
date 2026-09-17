@@ -28,7 +28,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     addOutboundInviteHandler<InboundPayload, OutboundPayload>(
         discoveryKey: Uint8Array,
         purpose: string,
-        expiresMillisSinceEpoch: number,
+        expiresMillisSinceEpoch: number | null,
         database: IInviteDatabase<InboundPayload, OutboundPayload>,
         updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>): void {
             throw new Error('wip')

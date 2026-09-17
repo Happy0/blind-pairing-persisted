@@ -16,7 +16,6 @@ export type Invite = {
 export interface IInviteManager<InboundPayload, OutboundPayload> {
     createInvite(
         key: Uint8Array,
-        purpose: string,
         count: number,
         expiresMillisSinceEpoch: number | null,
         payload: OutboundPayload): Promise<Invite>;
@@ -28,6 +27,7 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
 
 export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResource implements IInviteManager<InboundPayload, OutboundPayload>  {
 
+    private purpose: string;
     private inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>;
     private inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>;
     private multiplexedBlindPeering: MultiplexedBlindPeering;
@@ -36,15 +36,18 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
 
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
+        purpose: string,
         inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>,
         inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
     ) {
 
         super();
+        this.purpose = purpose;
         this.inviteUpdateHandler = inviteUpdateHandler;
         this.inviteDatabase = inviteDatabase;
 
         this.multiplexedBlindPeering = multiplexedBlindPeering;
+
     }
 
     protected override async   _open(): Promise<void> {
@@ -108,14 +111,11 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
 
     async createInvite(
         key: Uint8Array,
-        purpose: string,
         count: number,
         expiresMillisSinceEpoch: number | null, 
         payload: OutboundPayload): Promise<InternalOutboundInvite<OutboundPayload>> {
                 
-        const invite = BlindPairing.createInvite(key, {
-            data: encode(string, purpose)
-        })
+        const invite = BlindPairing.createInvite(key)
 
         const inviteId = b4a.toString(invite.id, 'hex');
 
@@ -129,7 +129,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
             invite: invite.invite,
             inviteId: inviteId,
             publicKey: invite.publicKey,
-            purpose: purpose,
+            purpose: this.purpose,
             remaining: count
         }
 
