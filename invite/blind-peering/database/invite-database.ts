@@ -14,6 +14,7 @@ export type DiscoveryKeyUsages = {
         discoveryKey: Uint8Array,
         count: number
     }>,
+    lastExpiryMillisSinceEpoch: number
 }
 
 export interface IInviteDatabase<InboundPayload, OutboundPayload> {
@@ -66,11 +67,12 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         const stream = this.getAllOutbound();
 
         for await (const entry of stream) {
-            if (isNotExpired(entry) && (entry.remaining === null || entry.remaining > 0)) {
+            if (isNotExpired(entry)) {
                 yield entry;
             }
         }
     }
+
     async *getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>> {
         const inviteRange = getInviteRange('outbound')
 

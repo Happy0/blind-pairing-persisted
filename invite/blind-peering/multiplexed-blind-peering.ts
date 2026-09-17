@@ -3,13 +3,18 @@ import type Hyperswarm from "hyperswarm";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
+import type { InternalInboundInvite } from "./model.js";
+
+type Opts = {
+    removeInviteOnFullyUsed: boolean
+};
 
 // TODO (readability: come up with a better name for this thing ':D)
 export class MultiplexedBlindPeering extends ReadyResource {
 
     private blindPairing: BlindPairing;
 
-    constructor(hyperswarm: Hyperswarm) {
+    constructor(hyperswarm: Hyperswarm, opts: Opts | undefined) {
         super();
 
         this.blindPairing = new BlindPairing(hyperswarm);
@@ -23,6 +28,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     addOutboundInviteHandler<InboundPayload, OutboundPayload>(
         discoveryKey: Uint8Array,
         purpose: string,
+        expiresMillisSinceEpoch: number,
         database: IInviteDatabase<InboundPayload, OutboundPayload>,
         updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>): void {
             throw new Error('wip')
@@ -33,7 +39,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        invite: Uint8Array,
+        invite: InternalInboundInvite<InboundPayload>,
         database: IInviteDatabase<InboundPayload, OutboundPayload>,
         updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>): ReadyResource {
         throw new Error('wip')

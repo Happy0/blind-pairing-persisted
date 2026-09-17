@@ -1,11 +1,10 @@
 import ReadyResource from "ready-resource";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
-import type Hyperswarm from "hyperswarm";
-import { type InviteId, type InternalOutboundInvite, type InternalInboundInvite } from "./model.js";
-import BlindPairing, {type Candidate, type Member } from "blind-pairing";
+import { type InternalOutboundInvite, type InternalInboundInvite } from "./model.js";
+import BlindPairing from "blind-pairing";
 import {string} from 'compact-encoding/index.js'
-import { encode, type Codec } from "compact-encoding";
+import { encode } from "compact-encoding";
 import b4a from 'b4a';
 import type { MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
 
@@ -56,6 +55,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
             this.multiplexedBlindPeering.addOutboundInviteHandler(
                 key.discoveryKey,
                 outboundDiscoveryKeys.purpose,
+                outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
                 this.inviteDatabase,
                 this.inviteUpdateHandler
             )
@@ -160,7 +160,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     }
 
     private acceptInvite(inbound: InternalInboundInvite<InboundPayload>): void {
-        const resource = this.multiplexedBlindPeering.addInboundInviteHandler(inbound.invite, this.inviteDatabase, this.inviteUpdateHandler)
+        const resource = this.multiplexedBlindPeering.addInboundInviteHandler(inbound, this.inviteDatabase, this.inviteUpdateHandler)
         this.inboundInvites[inbound.inviteId] = resource;
     }
 
@@ -171,9 +171,6 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
             this.inviteDatabase,
             this.inviteUpdateHandler
         )
-
     }
-    
-
 
 }
