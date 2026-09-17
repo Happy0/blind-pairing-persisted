@@ -5,14 +5,22 @@ import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./model.js";
 
-type Opts = {
+export type Opts = {
     removeInviteOnFullyUsed: boolean
 };
+
+export type OutboundInviteHandlerDetails<InboundPayload, OutboundPayload> = {
+    invite: InternalInboundInvite<InboundPayload>,
+    database: IInviteDatabase<InboundPayload, OutboundPayload>,
+    updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>
+}
 
 // TODO (readability: come up with a better name for this thing ':D)
 export class MultiplexedBlindPeering extends ReadyResource {
 
     private blindPairing: BlindPairing;
+
+    private outboundHandlers: Record<string, OutboundInviteHandlerDetails<unknown, unknown>> = {}
 
     constructor(hyperswarm: Hyperswarm, opts: Opts | undefined) {
         super();
@@ -39,9 +47,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        invite: InternalInboundInvite<InboundPayload>,
-        database: IInviteDatabase<InboundPayload, OutboundPayload>,
-        updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>): ReadyResource {
+        details: OutboundInviteHandlerDetails<InboundPayload, OutboundPayload>): ReadyResource {
         throw new Error('wip')
     }
 
