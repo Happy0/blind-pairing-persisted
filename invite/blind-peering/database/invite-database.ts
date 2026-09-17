@@ -8,12 +8,19 @@ export type InviteAcceptanceResult = {
     outcome: 'added' | 'duplicate'
 }
 
+export type DiscoveryKeyUsages = {
+    purpose: string,
+    keys: Array<{
+        discoveryKey: Uint8Array,
+        count: number
+    }>,
+}
+
 export interface IInviteDatabase<InboundPayload, OutboundPayload> {
     upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
 
-    getOutboundInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | null>
-    getInboundInvite(inviteId: string): Promise<InternalInboundInvite<InboundPayload> | null>
+    getInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | InternalInboundInvite<InboundPayload> | null>
 
     deleteInvite(inviteId: string): Promise<void>
 
@@ -25,6 +32,10 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
 
     getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
     getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
+
+    getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages>;
+
+    hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>;
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
@@ -34,12 +45,21 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
 
     /**
      * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
+     * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
      * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
      */
-    constructor(privateHyperbee: Hyperbee, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
+    constructor(privateHyperbee: Hyperbee, purpose: string, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
         this.inboundInviteCodec = createInboundInviteCodec(inboundCodec);
         this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
-        this.privateHyperbee = privateHyperbee;
+        this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
+    }
+
+    getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
+        throw new Error('wip');
+    }
+
+    hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
+        throw new Error('wip');
     }
 
     async *getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>> {
@@ -84,7 +104,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         return result;
     }
 
-    async getOutboundInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | null> {
+    async getInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | InternalInboundInvite<InboundPayload> | null> {
         const mappingKey = getKeyMappingKey(inviteId);
 
         const item = await this.privateHyperbee.get(mappingKey)
@@ -99,9 +119,10 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
             return null;
         }
 
-        const result = decode(this.outboundInviteCodec, invite.value);
+        // TODO: make Codec that can deal with both inbound + outbound
+        //const result = decode(this.outboundInviteCodec, invite.value);
 
-        return result;
+        throw new Error('wip')
     }
 
     async deleteInvite(inviteId: string): Promise<void> {

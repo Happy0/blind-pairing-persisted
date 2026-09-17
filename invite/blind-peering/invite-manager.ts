@@ -2,7 +2,7 @@ import ReadyResource from "ready-resource";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import type Hyperswarm from "hyperswarm";
-import { type InviteId, type InternalOutboundInvite } from "./model.js";
+import { type InviteId, type InternalOutboundInvite, type InternalInboundInvite } from "./model.js";
 import BlindPairing, {type Candidate, type Member } from "blind-pairing";
 import {string} from 'compact-encoding/index.js'
 import { encode, type Codec } from "compact-encoding";
@@ -22,7 +22,7 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
         expiresMillisSinceEpoch: number | null,
         payload: OutboundPayload): Promise<Invite>;
 
-    useInvite(InboundInvite: Invite): Promise<void>;
+    useInvite(InboundInvite: Invite, payload: InboundPayload): Promise<void>;
 
     deleteInvite(inviteId: string): Promise<void>;
 }
@@ -33,7 +33,6 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     private inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>;
     private multiplexedBlindPeering: MultiplexedBlindPeering;
 
-    private outgoingInvites: Record<string, ReadyResource> = {};
     private inboundInvites: Record<string, ReadyResource> = {};
 
     constructor(
@@ -49,33 +48,61 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         this.multiplexedBlindPeering = multiplexedBlindPeering;
     }
 
-    protected override _open(): Promise<void> {
-        const outboundDiscoveryKeys = this.inviteDatabase.getAllActiveOutbound()
+    protected override async   _open(): Promise<void> {
         const inboundDiscoveryKeys = this.inviteDatabase.getAllActiveInbound();
+        const outboundDiscoveryKeys = await this.inviteDatabase.getActiveDiscoveryKeys();
 
-        throw new Error('wip')
+        for (const key of outboundDiscoveryKeys.keys) {
+            this.multiplexedBlindPeering.addOutboundInviteHandler(
+                key.discoveryKey,
+                outboundDiscoveryKeys.purpose,
+                this.inviteDatabase,
+                this.inviteUpdateHandler
+            )
+        }
+
+        for await (const inbound of inboundDiscoveryKeys) {
+            this.acceptInvite(inbound);
+        }
+
     }
 
     protected override async _close(): Promise<void> {
-        const outgoing = Object.values(this.outgoingInvites).map(invite => invite.close());
         const incoming = Object.values(this.inboundInvites).map(invite => invite.close());
+        await Promise.all(incoming);
 
-        await Promise.all([...outgoing, ...incoming]);
+        const outboundDiscoveryKeys = await this.inviteDatabase.getActiveDiscoveryKeys();
+
+        for (const key of outboundDiscoveryKeys.keys) {
+            this.multiplexedBlindPeering.removeOutboundInviteHandler(key.discoveryKey, outboundDiscoveryKeys.purpose);
+        }
+
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
-        await this.inviteDatabase.deleteInvite(inviteId);
+        const invite = await this.inviteDatabase.getInvite(inviteId);
 
-        const inbound = this.inboundInvites[inviteId];
-
-        if (inbound) {
-            inbound.close();
+        if (!invite) {
+            return;
         }
 
-        const outbound = this.outgoingInvites[inviteId];
+        if (invite.direction === 'inbound') {
+            const inbound = this.inboundInvites[inviteId];
 
-        if (outbound) {
-            outbound.close()
+            await this.inviteDatabase.deleteInvite(inviteId);
+
+            if (inbound) {
+                await inbound.close();
+            }
+
+        } else {
+            await this.inviteDatabase.deleteInvite(inviteId);
+
+            const discoveryKeyInUse = await this.inviteDatabase.hasActiveInviteWithDiscoveryKey(invite.discoveryKey)
+
+            if (!discoveryKeyInUse) {
+                await this.multiplexedBlindPeering.removeOutboundInviteHandler(invite.discoveryKey, invite.purpose);
+            }
         }
     }
 
@@ -112,13 +139,39 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         return outboundInvite;
     }
 
-    useInvite(invite: Invite): Promise<void> {
-        throw new Error("Method not implemented.");
+    async useInvite(invite: Invite, payload: InboundPayload): Promise<void> {
+
+        // TODO (robust): add decode invite function to holepunch types
+        const decodedInvite = (BlindPairing as any).decodeInvite(invite.invite);
+
+        const inboundInvite: InternalInboundInvite<InboundPayload> = {
+            createdAtMillisSinceEpoch: Date.now(),
+            direction: 'inbound',
+            invite: invite.invite,
+            expiresMillisSinceEpoch: decodedInvite.expires,
+            purpose: invite.purpose,
+            status: 'pending',
+            inviteId: decodedInvite.id,
+            payload: payload,
+        }
+
+        await this.inviteDatabase.upsertInbound(inboundInvite);
+        await this.acceptInvite(inboundInvite);
+    }
+
+    private acceptInvite(inbound: InternalInboundInvite<InboundPayload>): void {
+        const resource = this.multiplexedBlindPeering.addInboundInviteHandler(inbound.invite, this.inviteDatabase, this.inviteUpdateHandler)
+        this.inboundInvites[inbound.inviteId] = resource;
     }
 
     private listenForInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>): void {
-        const resource = this.multiplexedBlindPeering.addOutboundInviteHandler(invite.discoveryKey, invite.purpose, this.inviteDatabase, this.inviteUpdateHandler)
-        this.outgoingInvites[invite.inviteId] = resource;
+        this.multiplexedBlindPeering.addOutboundInviteHandler(
+            invite.discoveryKey,
+            invite.purpose,
+            this.inviteDatabase,
+            this.inviteUpdateHandler
+        )
+
     }
     
 

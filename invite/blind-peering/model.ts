@@ -25,7 +25,6 @@ export type InternalInboundInvite<Payload> = {
     createdAtMillisSinceEpoch: number,
     expiresMillisSinceEpoch: number | null,
     payload: Payload,
-    inviteCode: Uint8Array,
     status: 'pending' | 'complete' | 'failed'
 }
 
@@ -66,7 +65,6 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
                 createdAtMillisSinceEpoch: uint.decode(state),
                 expiresMillisSinceEpoch: (flags & HAS_EXPIRES) ? uint.decode(state) : null,
                 payload: payloadCodec.decode(state),
-                inviteCode: buffer.decode(state),
                 status: statusCodec.decode(state)
             }
         },
@@ -78,7 +76,6 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
             uint.encode(state, value.createdAtMillisSinceEpoch)
             if (value.expiresMillisSinceEpoch !== null) uint.encode(state, value.expiresMillisSinceEpoch)
             payloadCodec.encode(state, value.payload)
-            buffer.encode(state, value.inviteCode)
             statusCodec.encode(state, value.status)
         },
         preencode: (state: State, value: InternalInboundInvite<Payload>): void => {
@@ -89,7 +86,6 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
             uint.preencode(state, value.createdAtMillisSinceEpoch)
             if (value.expiresMillisSinceEpoch !== null) uint.preencode(state, value.expiresMillisSinceEpoch)
             payloadCodec.preencode(state, value.payload)
-            buffer.preencode(state, value.inviteCode)
             statusCodec.preencode(state, value.status)
         }
     }
