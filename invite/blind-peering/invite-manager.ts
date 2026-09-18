@@ -4,7 +4,7 @@ import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import { type InternalOutboundInvite, type InternalInboundInvite } from "./model.js";
 import BlindPairing from "blind-pairing";
 import {string} from 'compact-encoding/index.js'
-import { encode } from "compact-encoding";
+import { encode, type Codec } from "compact-encoding";
 import b4a from 'b4a';
 import type { InboundInviteHandlerOpts, MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
 
@@ -36,12 +36,18 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
 
     private removeInviteOnFullyUsed: boolean;
 
+    private inboundInviteCodec: Codec<InboundPayload>;
+    private outboundInviteCodec: Codec<OutboundPayload>;
+
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
         purpose: string,
         removeInviteOnFullyUsed: boolean,
         inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>,
         inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
+        inboundCodec: Codec<InboundPayload>,
+        outboundCodec: Codec<OutboundPayload>
+        
     ) {
 
         super();
@@ -51,6 +57,9 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
 
         this.multiplexedBlindPeering = multiplexedBlindPeering;
         this.removeInviteOnFullyUsed = removeInviteOnFullyUsed;
+
+        this.inboundInviteCodec = inboundCodec;
+        this.outboundInviteCodec = outboundCodec;
 
     }
 
@@ -66,7 +75,9 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
                     expiresMillisSinceEpoch: outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
                     purpose: outboundDiscoveryKeys.purpose,
                     updateHandler: this.inviteUpdateHandler,
-                    removeInviteOnFullyUsed: this.removeInviteOnFullyUsed
+                    removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
+                    inboundCodec: this.inboundInviteCodec,
+                    outboundCodec: this.outboundInviteCodec
                 }
             )
         }
@@ -185,7 +196,9 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
                 expiresMillisSinceEpoch: invite.expiresMillisSinceEpoch,
                 purpose: invite.purpose,
                 updateHandler: this.inviteUpdateHandler,
-                removeInviteOnFullyUsed: this.removeInviteOnFullyUsed
+                removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
+                inboundCodec: this.inboundInviteCodec,
+                outboundCodec: this.outboundInviteCodec
             }
         )
     }
