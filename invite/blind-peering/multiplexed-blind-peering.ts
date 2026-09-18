@@ -5,12 +5,17 @@ import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./model.js";
 
-export type Opts = {
-    removeInviteOnFullyUsed: boolean
-};
-
-export type OutboundInviteHandlerDetails<InboundPayload, OutboundPayload> = {
+export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>,
+    database: IInviteDatabase<InboundPayload, OutboundPayload>,
+    updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>
+}
+
+export type OutboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
+    discoveryKey: Uint8Array,
+    purpose: string,
+    expiresMillisSinceEpoch: number | null,
+    removeInviteOnFullyUsed: boolean,
     database: IInviteDatabase<InboundPayload, OutboundPayload>,
     updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>
 }
@@ -20,9 +25,9 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
     private blindPairing: BlindPairing;
 
-    private outboundHandlers: Record<string, OutboundInviteHandlerDetails<unknown, unknown>> = {}
+    private outboundHandlers: Record<string, InboundInviteHandlerOpts<unknown, unknown>> = {}
 
-    constructor(hyperswarm: Hyperswarm, opts: Opts | undefined) {
+    constructor(hyperswarm: Hyperswarm) {
         super();
 
         this.blindPairing = new BlindPairing(hyperswarm);
@@ -34,11 +39,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     addOutboundInviteHandler<InboundPayload, OutboundPayload>(
-        discoveryKey: Uint8Array,
-        purpose: string,
-        expiresMillisSinceEpoch: number | null,
-        database: IInviteDatabase<InboundPayload, OutboundPayload>,
-        updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>): void {
+        details: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): void {
             throw new Error('wip')
     }
 
@@ -47,7 +48,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        details: OutboundInviteHandlerDetails<InboundPayload, OutboundPayload>): ReadyResource {
+        details: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
         throw new Error('wip')
     }
 

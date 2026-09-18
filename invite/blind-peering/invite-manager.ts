@@ -6,7 +6,7 @@ import BlindPairing from "blind-pairing";
 import {string} from 'compact-encoding/index.js'
 import { encode } from "compact-encoding";
 import b4a from 'b4a';
-import type { MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
+import type { InboundInviteHandlerOpts, MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
 
 export type Invite = {
      invite: Uint8Array,
@@ -34,9 +34,12 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
 
     private inboundInvites: Record<string, ReadyResource> = {};
 
+    private removeInviteOnFullyUsed: boolean;
+
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
         purpose: string,
+        removeInviteOnFullyUsed: boolean,
         inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>,
         inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
     ) {
@@ -47,6 +50,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         this.inviteDatabase = inviteDatabase;
 
         this.multiplexedBlindPeering = multiplexedBlindPeering;
+        this.removeInviteOnFullyUsed = removeInviteOnFullyUsed;
 
     }
 
@@ -56,11 +60,14 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
 
         for (const key of outboundDiscoveryKeys.keys) {
             this.multiplexedBlindPeering.addOutboundInviteHandler(
-                key.discoveryKey,
-                outboundDiscoveryKeys.purpose,
-                outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
-                this.inviteDatabase,
-                this.inviteUpdateHandler
+                {
+                    database: this.inviteDatabase,
+                    discoveryKey: key.discoveryKey,
+                    expiresMillisSinceEpoch: outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
+                    purpose: outboundDiscoveryKeys.purpose,
+                    updateHandler: this.inviteUpdateHandler,
+                    removeInviteOnFullyUsed: this.removeInviteOnFullyUsed
+                }
             )
         }
 
@@ -160,16 +167,26 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
     }
 
     private acceptInvite(inbound: InternalInboundInvite<InboundPayload>): void {
-        const resource = this.multiplexedBlindPeering.addInboundInviteHandler(inbound, this.inviteDatabase, this.inviteUpdateHandler)
+
+        const resource = this.multiplexedBlindPeering.addInboundInviteHandler({
+            database: this.inviteDatabase,
+            invite: inbound,
+            updateHandler: this.inviteUpdateHandler
+        });
+
         this.inboundInvites[inbound.inviteId] = resource;
     }
 
     private listenForInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>): void {
         this.multiplexedBlindPeering.addOutboundInviteHandler(
-            invite.discoveryKey,
-            invite.purpose,
-            this.inviteDatabase,
-            this.inviteUpdateHandler
+            {
+                database: this.inviteDatabase,
+                discoveryKey: invite.discoveryKey,
+                expiresMillisSinceEpoch: invite.expiresMillisSinceEpoch,
+                purpose: invite.purpose,
+                updateHandler: this.inviteUpdateHandler,
+                removeInviteOnFullyUsed: this.removeInviteOnFullyUsed
+            }
         )
     }
 
