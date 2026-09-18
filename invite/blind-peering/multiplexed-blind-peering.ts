@@ -5,7 +5,7 @@ import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./model.js";
 import b4a from 'b4a';
-import { decode, type Codec } from "compact-encoding";
+import { decode, encode, type Codec } from "compact-encoding";
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>,
@@ -46,8 +46,8 @@ export class MultiplexedBlindPeering extends ReadyResource {
         await this.blindPairing.close()
     }
 
-    addOutboundInviteHandler<InboundPayload, OutboundPayload>(
-        details: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): void {
+    async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
+        details: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<void> {
             const discoveryKeyHex = b4a.toString(details.discoveryKey);
 
             const existingHandler = this.outboundHandlers[discoveryKeyHex]?.find(handler => handler.handlerOpts.purpose === details.purpose);
@@ -57,8 +57,10 @@ export class MultiplexedBlindPeering extends ReadyResource {
                     {
                         discoveryKey: details.discoveryKey,
                         async onadd (_candidate: Candidate) {
+                            // TODO (robust): mutex per invite ID
+
                             const candidate = _candidate as unknown as any;
-                            const inviteId = candidate.inviteId;
+                            const inviteId = candidate.request.inviteId;
 
                             const dbEntry = await details.database.getInvite(inviteId);
 
@@ -66,8 +68,30 @@ export class MultiplexedBlindPeering extends ReadyResource {
                                 return;
                             }
 
+                            // TODO (robust): try / catch for decode failure? Is the top level handler of onAdd enough?
                             const payload = candidate.open(dbEntry.publicKey);
                             const decodedInbound = decode(details.inboundCodec, payload);
+
+                            const existingRedemption = await details.database.isAlreadyUsed(inviteId, candidate.request.session);
+
+                            const outboundPayload = encode(details.outboundCodec, dbEntry.extraData);
+
+                            if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now()) {
+                                candidate.confirm(outboundPayload)
+                            }
+                            else if (existingRedemption) {
+                                candidate.confirm(outboundPayload)
+                                existingHandler.handlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
+                            }
+                            else if (dbEntry.remaining === 0) {
+                                candidate.deny({status: 2});
+                                return;
+                            } else {
+                                candidate.confirm(outboundPayload)
+                                existingHandler.handlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
+
+                                // TODO: reduce the db count by one
+                            }
 
                             
 
@@ -76,6 +100,11 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 )
 
                 this.outboundHandlers[discoveryKeyHex] = [{member: m, handlerOpts: details}]
+
+                await (m as any).flushed();
+
+
+
             }
     }
 
