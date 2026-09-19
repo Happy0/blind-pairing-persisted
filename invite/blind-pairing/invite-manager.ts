@@ -130,7 +130,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
         key: Uint8Array,
         count: number,
         expiresMillisSinceEpoch: number | null, 
-        payload: OutboundAdditionalData | null): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
+        payload: OutboundAdditionalData): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
 
         const additionalData = encode(this.outboundInviteCodec, payload);
                 
@@ -145,10 +145,11 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
             direction: 'outbound',
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
-            additionalData: additionalDataSignature && payload ? {
+            additionalData: {
                 data: payload,
-                signature: additionalDataSignature
-            } : null,
+                // TODO (robust): don't coerce with !
+                signature: additionalDataSignature!
+            },
             invite: invite.invite,
             inviteId: inviteId,
             key: key,

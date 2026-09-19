@@ -162,17 +162,24 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
         const userData = encode(inboundHandlerOpts.inboundCodec, inboundHandlerOpts.invite.payload);
 
-        const candidate = this.blindPairing.addCandidate({
+        // TODO (robust): update holepunch typescript bindings to include 'data' parameter
+        const candidate = (this.blindPairing as any).addCandidate({
             invite: inboundHandlerOpts.invite.invite,
             userData: userData,
-            onadd( result: { key: Uint8Array; encryptionKey: Uint8Array, data: Uint8Array } ) {
-                // ???
+            async onadd( result: { key: Uint8Array; encryptionKey: Uint8Array, data: Uint8Array } ) {
+                const decodedData = decode(inboundHandlerOpts.outboundCodec, result.data)
+
+                inboundHandlerOpts.invite.status = 'complete';
+                await inboundHandlerOpts.database.upsertInbound(
+                    inboundHandlerOpts.invite
+                )
+
+                await inboundHandlerOpts.updateHandler.onInviteConfirmed(inboundHandlerOpts.invite, decodedData)
                 
+                await candidate.close()
             }
         })        
-
-        // ???
-
+        
         return candidate;
     }
 
