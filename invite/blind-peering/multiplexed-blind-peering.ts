@@ -7,6 +7,7 @@ import type { InternalInboundInvite } from "./model.js";
 import b4a from 'b4a';
 import { decode, encode, type Codec } from "compact-encoding";
 import {Mutex} from 'async-mutex';
+import { SequentialRunner } from "./sequential-runner.js";
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>,
@@ -32,6 +33,8 @@ type HandlerEntry = {
 
 export class MultiplexedBlindPeering extends ReadyResource {
 
+    private sequentialRunner: SequentialRunner;
+
     private blindPairing: BlindPairing;
     private outboundHandlers: Record<string, Array<HandlerEntry>> = {}
 
@@ -40,6 +43,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     constructor(hyperswarm: Hyperswarm) {
         super();
 
+        this.sequentialRunner = new SequentialRunner();
         this.blindPairing = new BlindPairing(hyperswarm);
     }
 
@@ -49,67 +53,76 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
-        details: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<void> {
-            const discoveryKeyHex = b4a.toString(details.discoveryKey);
+        outboundInviteHandlerOpts: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<void> {
+            const discoveryKeyHex = b4a.toString(outboundInviteHandlerOpts.discoveryKey);
+            const handler = this.outboundHandlers[discoveryKeyHex]
+                ?.find(handler => handler.handlerOpts.purpose === outboundInviteHandlerOpts.purpose);
 
-            const existingHandler = this.outboundHandlers[discoveryKeyHex]?.find(handler => handler.handlerOpts.purpose === details.purpose);
-
-            if (existingHandler !== undefined) {
+            if (handler !== undefined) {
                 const outer = this;
 
                 const m = this.blindPairing.addMember(
                     {
-                        discoveryKey: details.discoveryKey,
+                        discoveryKey: outboundInviteHandlerOpts.discoveryKey,
                         async onadd (_candidate: Candidate) {
-                            // TODO (robust): mutex per invite ID
-
+                            // TODO (robust): expand holepunch blind-peering typescript bindings
                             const candidate = _candidate as unknown as any;
                             const inviteId = b4a.toString(candidate.request.inviteId, 'hex');
 
-                            const dbEntry = await details.database.getInvite(inviteId);
-
-                            if (dbEntry === null || dbEntry.direction !== 'outbound') {
-                                return;
-                            }
-
-                            // TODO (robust): try / catch for decode failure? Is the top level handler of onAdd enough?
-                            const payload = candidate.open(dbEntry.publicKey);
-                            const decodedInbound = decode(details.inboundCodec, payload);
-
-                            const existingRedemption = await details.database.isAlreadyUsed(inviteId, candidate.request.session);
-
-                            const outboundPayload = encode(details.outboundCodec, dbEntry.extraData);
-
-                            if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now()) {
-                                candidate.confirm(outboundPayload)
-                            }
-                            else if (existingRedemption) {
-                                candidate.confirm(outboundPayload)
-                                existingHandler.handlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
-                            }
-                            else if (dbEntry.remaining === 0) {
-                                candidate.deny({status: 2});
-                                return;
-                            } else {
-                                candidate.confirm(outboundPayload)
-                                existingHandler.handlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
-
-                                // TODO: reduce the db count by one 
-                            }
-
-                            
-
+                            await outer.sequentialRunner.runSequentiallyPerId(inviteId, async () =>
+                                outer.handleOutboundInviteAcceptance(inviteId, _candidate, outboundInviteHandlerOpts)
+                            );
                         }
                     }
                 )
 
-                this.outboundHandlers[discoveryKeyHex] = [{member: m, handlerOpts: details}]
+                this.outboundHandlers[discoveryKeyHex] = [{member: m, handlerOpts: outboundInviteHandlerOpts}]
 
                 await (m as any).flushed();
-
-
-
             }
+    }
+
+    private async handleOutboundInviteAcceptance<InboundPayload, OutboundPayload>(
+        inviteId: string,
+        _candidate: Candidate,
+        outboundInviteHandlerOpts: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>
+    ): Promise<void> {
+        const candidate = _candidate as unknown as any;
+        const sessionId = candidate.request.session;
+
+        const dbEntry = await outboundInviteHandlerOpts.database.getInvite(inviteId);
+
+        if (dbEntry === null || dbEntry.direction !== 'outbound') {
+            return;
+        }
+
+        // TODO (robust): try / catch for decode failure? Is the top level handler of onAdd enough?
+        const payload = candidate.open(dbEntry.publicKey);
+        const decodedInbound = decode(outboundInviteHandlerOpts.inboundCodec, payload);
+
+        const existingRedemption = await outboundInviteHandlerOpts.database.isAlreadyUsed(inviteId, candidate.request.session);
+        const outboundPayload = encode(outboundInviteHandlerOpts.outboundCodec, dbEntry.extraData);
+
+        if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now()) {
+            candidate.confirm(outboundPayload)
+        }
+        else if (existingRedemption) {
+            candidate.confirm(outboundPayload)
+        }
+        else if (dbEntry.remaining === 0) {
+            candidate.deny({status: 2});
+            return;
+        } else {
+            candidate.confirm(outboundPayload)
+            const remaining = dbEntry.remaining ? dbEntry.remaining - 1 : null;
+            dbEntry.remaining = remaining;
+
+            // TODO (robust): do these two in a batch / transaction
+            await outboundInviteHandlerOpts.database.upsertOutbound(dbEntry);
+            await outboundInviteHandlerOpts.database.addInviteAcceptance(inviteId, sessionId)
+            
+            await outboundInviteHandlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
+        }
     }
 
     removeOutboundInviteHandler(discoveryKey: Uint8Array, purpose: string): void {
@@ -117,7 +130,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        details: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
+        OutboundInviteHandlerOpts: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
         throw new Error('wip')
     }
 
