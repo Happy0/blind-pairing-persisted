@@ -38,8 +38,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
     private blindPairing: BlindPairing;
     private outboundHandlers: Record<string, Array<HandlerEntry>> = {}
 
-    private mutexes: Record<string, Mutex> = {}
-
     constructor(hyperswarm: Hyperswarm) {
         super();
 
@@ -47,9 +45,13 @@ export class MultiplexedBlindPeering extends ReadyResource {
         this.blindPairing = new BlindPairing(hyperswarm);
     }
 
+    protected override async _open(): Promise<void> {
+        await this.blindPairing.ready();
+    }
+
     protected override async _close(): Promise<void> {
         // TODO (robust): do we need to close each member/candidate ourselves?
-        await this.blindPairing.close()
+        await this.blindPairing.close();
     }
 
     async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
