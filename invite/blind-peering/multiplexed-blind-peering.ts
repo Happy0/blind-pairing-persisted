@@ -127,12 +127,32 @@ export class MultiplexedBlindPeering extends ReadyResource {
         }
     }
 
-    removeOutboundInviteHandler(discoveryKey: Uint8Array, purpose: string): void {
+    async removeOutboundInviteHandler(discoveryKey: Uint8Array, purpose: string): void {
+        const discoveryKeyHex = b4a.toString(discoveryKey, 'hex');
 
+        const handlers = this.outboundHandlers[discoveryKeyHex];
+
+        if (handlers === undefined) {
+            return;
+        } else {
+            const purposeHandlerIndex = handlers.findIndex(handler => handler.handlerOpts.purpose === purpose);
+
+            if (purposeHandlerIndex > -1) {
+                const [removed] = handlers.splice(purposeHandlerIndex, 1)
+
+                if (handlers.length === 0 && removed !== undefined) {
+                    await removed.member.close()
+                    delete this.outboundHandlers[discoveryKeyHex];
+                }
+            }
+        }
     }
 
     addInboundInviteHandler<InboundPayload, OutboundPayload>(
         OutboundInviteHandlerOpts: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
+
+        
+
         throw new Error('wip')
     }
 

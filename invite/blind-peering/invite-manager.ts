@@ -186,6 +186,10 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         });
 
         this.inboundInvites[inbound.inviteId] = resource;
+
+        resource.on('close', () => {
+            delete this.inboundInvites[inbound.inviteId];
+        })
     }
 
     private listenForInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>): void {
