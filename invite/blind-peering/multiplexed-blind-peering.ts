@@ -6,6 +6,7 @@ import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./model.js";
 import b4a from 'b4a';
 import { decode, encode, type Codec } from "compact-encoding";
+import {Mutex} from 'async-mutex';
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>,
@@ -32,8 +33,9 @@ type HandlerEntry = {
 export class MultiplexedBlindPeering extends ReadyResource {
 
     private blindPairing: BlindPairing;
-
     private outboundHandlers: Record<string, Array<HandlerEntry>> = {}
+
+    private mutexes: Record<string, Mutex> = {}
 
     constructor(hyperswarm: Hyperswarm) {
         super();
@@ -53,6 +55,8 @@ export class MultiplexedBlindPeering extends ReadyResource {
             const existingHandler = this.outboundHandlers[discoveryKeyHex]?.find(handler => handler.handlerOpts.purpose === details.purpose);
 
             if (existingHandler !== undefined) {
+                const outer = this;
+
                 const m = this.blindPairing.addMember(
                     {
                         discoveryKey: details.discoveryKey,
@@ -60,7 +64,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                             // TODO (robust): mutex per invite ID
 
                             const candidate = _candidate as unknown as any;
-                            const inviteId = candidate.request.inviteId;
+                            const inviteId = b4a.toString(candidate.request.inviteId, 'hex');
 
                             const dbEntry = await details.database.getInvite(inviteId);
 
@@ -90,7 +94,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                                 candidate.confirm(outboundPayload)
                                 existingHandler.handlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
 
-                                // TODO: reduce the db count by one
+                                // TODO: reduce the db count by one 
                             }
 
                             
