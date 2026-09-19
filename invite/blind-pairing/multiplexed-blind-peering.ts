@@ -67,6 +67,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 const m = this.blindPairing.addMember(
                     {
                         discoveryKey: outboundInviteHandlerOpts.discoveryKey,
+
                         async onadd (_candidate: Candidate) {
                             // TODO (robust): expand holepunch blind-peering typescript bindings
                             const candidate = _candidate as unknown as any;
@@ -104,27 +105,17 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const decodedInbound = decode(outboundInviteHandlerOpts.inboundCodec, payload);
 
         const existingRedemption = await outboundInviteHandlerOpts.database.isAlreadyUsed(inviteId, candidate.request.session);
-        const outboundPayload = encode(outboundInviteHandlerOpts.outboundCodec, dbEntry.extraData);
+        const additional = {
+            data: encode(outboundInviteHandlerOpts.outboundCodec, dbEntry.additionalData.data),
+            signature: dbEntry.additionalData.signature
+        }
 
         if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now()) {
             candidate.confirm({
-                // TODO: add key to invite model in DB, etc
-                key: undefined,
-                additional: outboundPayload
+                key: dbEntry.key,
+                additional: additional
             })
-        }
-        else if (existingRedemption) {
-            candidate.confirm(outboundPayload)
-        }
-        else if (dbEntry.remaining === 0) {
-            candidate.deny({status: 2});
-            return;
-        } else {
-            candidate.confirm({
-                // TODO: add key to invite model in DB, etc
-                key: undefined,
-                additional: outboundPayload
-            })
+
             const remaining = dbEntry.remaining ? dbEntry.remaining - 1 : null;
             dbEntry.remaining = remaining;
 
@@ -133,6 +124,15 @@ export class MultiplexedBlindPeering extends ReadyResource {
             await outboundInviteHandlerOpts.database.addInviteAcceptance(inviteId, sessionId)
 
             await outboundInviteHandlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
+        }
+        else if (existingRedemption) {
+            candidate.confirm({
+                key: dbEntry.key,
+                additional: additional
+            })
+        } else {
+            candidate.deny({status: 2});
+            return;
         }
     }
 
@@ -165,8 +165,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const candidate = this.blindPairing.addCandidate({
             invite: inboundHandlerOpts.invite.invite,
             userData: userData,
-            onadd( result: { key: Uint8Array; encryptionKey: Uint8Array, additional: Uint8Array } ) {
-                
+            onadd( result: { key: Uint8Array; encryptionKey: Uint8Array, data: Uint8Array } ) {
                 // ???
                 
             }

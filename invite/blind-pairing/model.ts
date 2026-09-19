@@ -11,10 +11,14 @@ export type InternalOutboundInvite<Payload> = {
     createdAtMillisSinceEpoch: number,
     publicKey: Uint8Array,
     discoveryKey: Uint8Array,
+    key: Uint8Array,
     count: number | null,
     remaining: number | null,
     expiresMillisSinceEpoch: number | null,
-    extraData: Payload
+    additionalData: {
+        data:  Payload,
+        signature: Uint8Array
+    }
 }
 
 export type InternalInboundInvite<Payload> = {
@@ -104,10 +108,14 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
                 createdAtMillisSinceEpoch: uint.decode(state),
                 publicKey: fixed32.decode(state),
                 discoveryKey: fixed32.decode(state),
+                key: fixed32.decode(state),
                 count: (flags & HAS_COUNT) ? uint.decode(state) : null,
                 remaining: (flags & HAS_REMAINING) ? uint.decode(state) : null,
                 expiresMillisSinceEpoch: (flags & HAS_EXPIRES) ? uint.decode(state) : null,
-                extraData: payloadCodec.decode(state)
+                additionalData: {
+                    data: payloadCodec.decode(state),
+                    signature: fixed32.decode(state)
+                }
             }
         },
         encode: (state: State, value: InternalOutboundInvite<Payload>): void => {
@@ -118,10 +126,12 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             uint.encode(state, value.createdAtMillisSinceEpoch)
             fixed32.encode(state, value.publicKey)
             fixed32.encode(state, value.discoveryKey)
+            fixed32.encode(state, value.key)
             if (value.count !== null) uint.encode(state, value.count)
             if (value.remaining !== null) uint.encode(state, value.remaining)
             if (value.expiresMillisSinceEpoch !== null) uint.encode(state, value.expiresMillisSinceEpoch)
-            payloadCodec.encode(state, value.extraData)
+            payloadCodec.encode(state, value.additionalData.data)
+            fixed32.encode(state, value.additionalData.signature)
         },
         preencode: (state: State, value: InternalOutboundInvite<Payload>): void => {
             uint.preencode(state, outboundFlags(value))
@@ -131,10 +141,12 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             uint.preencode(state, value.createdAtMillisSinceEpoch)
             fixed32.preencode(state, value.publicKey)
             fixed32.preencode(state, value.discoveryKey)
+            fixed32.preencode(state, value.key);
             if (value.count !== null) uint.preencode(state, value.count)
             if (value.remaining !== null) uint.preencode(state, value.remaining)
             if (value.expiresMillisSinceEpoch !== null) uint.preencode(state, value.expiresMillisSinceEpoch)
-            payloadCodec.preencode(state, value.extraData)
+            if (value.additionalData) payloadCodec.preencode(state, value.additionalData.data)
+            fixed32.preencode(state, value.additionalData.signature)
         }
     }
 }
@@ -146,5 +158,5 @@ function inboundFlags(value: InternalInboundInvite<unknown>): number {
 function outboundFlags(value: InternalOutboundInvite<unknown>): number {
     return (value.expiresMillisSinceEpoch !== null ? HAS_EXPIRES : 0) |
         (value.count !== null ? HAS_COUNT : 0) |
-        (value.remaining !== null ? HAS_REMAINING : 0)
+        (value.remaining !== null ? HAS_REMAINING : 0) 
 }

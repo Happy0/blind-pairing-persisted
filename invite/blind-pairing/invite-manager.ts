@@ -25,29 +25,28 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
     deleteInvite(inviteId: string): Promise<void>;
 }
 
-export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResource implements IInviteManager<InboundPayload, OutboundPayload>  {
+export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extends ReadyResource implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>  {
 
     private purpose: string;
-    private inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>;
-    private inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>;
+    private inviteUpdateHandler: InviteUpdateHandler<InboundAdditionalData, OutboundAdditionalData>;
+    private inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>;
     private multiplexedBlindPeering: MultiplexedBlindPeering;
 
     private inboundInvites: Record<string, ReadyResource> = {};
 
     private removeInviteOnFullyUsed: boolean;
 
-    private inboundInviteCodec: Codec<InboundPayload>;
-    private outboundInviteCodec: Codec<OutboundPayload>;
+    private inboundInviteCodec: Codec<InboundAdditionalData>;
+    private outboundInviteCodec: Codec<OutboundAdditionalData>;
 
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
         purpose: string,
         removeInviteOnFullyUsed: boolean,
-        inviteDatabase: IInviteDatabase<InboundPayload, OutboundPayload>,
-        inviteUpdateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
-        inboundCodec: Codec<InboundPayload>,
-        outboundCodec: Codec<OutboundPayload>
-        
+        inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>,
+        inviteUpdateHandler: InviteUpdateHandler<InboundAdditionalData, OutboundAdditionalData>,
+        inboundCodec: Codec<InboundAdditionalData>,
+        outboundCodec: Codec<OutboundAdditionalData>
     ) {
 
         super();
@@ -131,21 +130,28 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         key: Uint8Array,
         count: number,
         expiresMillisSinceEpoch: number | null, 
-        payload: OutboundPayload): Promise<InternalOutboundInvite<OutboundPayload>> {
-                
-        const invite = BlindPairing.createInvite(key)
+        payload: OutboundAdditionalData | null): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
 
+        const additionalData = encode(this.outboundInviteCodec, payload);
+                
+        const invite = BlindPairing.createInvite(key, {data: additionalData} )
         const inviteId = b4a.toString(invite.id, 'hex');
 
-        const outboundInvite: InternalOutboundInvite<OutboundPayload> = {
+        const additionalDataSignature = invite.additional?.signature;
+
+        const outboundInvite: InternalOutboundInvite<OutboundAdditionalData> = {
             count: count,
             createdAtMillisSinceEpoch: Date.now(),
             direction: 'outbound',
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
-            extraData: payload,
+            additionalData: additionalDataSignature && payload ? {
+                data: payload,
+                signature: additionalDataSignature
+            } : null,
             invite: invite.invite,
             inviteId: inviteId,
+            key: key,
             publicKey: invite.publicKey,
             purpose: this.purpose,
             remaining: count
@@ -157,12 +163,12 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         return outboundInvite;
     }
 
-    async useInvite(invite: Invite, payload: InboundPayload): Promise<void> {
+    async useInvite(invite: Invite, payload: InboundAdditionalData): Promise<void> {
 
         // TODO (robust): add decode invite function to holepunch types
         const decodedInvite = (BlindPairing as any).decodeInvite(invite.invite);
 
-        const inboundInvite: InternalInboundInvite<InboundPayload> = {
+        const inboundInvite: InternalInboundInvite<InboundAdditionalData> = {
             createdAtMillisSinceEpoch: Date.now(),
             direction: 'inbound',
             invite: invite.invite,
@@ -177,12 +183,14 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         await this.acceptInvite(inboundInvite);
     }
 
-    private acceptInvite(inbound: InternalInboundInvite<InboundPayload>): void {
+    private acceptInvite(inbound: InternalInboundInvite<InboundAdditionalData>): void {
 
         const resource = this.multiplexedBlindPeering.addInboundInviteHandler({
             database: this.inviteDatabase,
             invite: inbound,
-            updateHandler: this.inviteUpdateHandler
+            updateHandler: this.inviteUpdateHandler,
+            inboundCodec: this.inboundInviteCodec,
+            outboundCodec: this.outboundInviteCodec
         });
 
         this.inboundInvites[inbound.inviteId] = resource;
@@ -192,7 +200,7 @@ export class InviteManager<InboundPayload, OutboundPayload> extends ReadyResourc
         })
     }
 
-    private listenForInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>): void {
+    private listenForInviteAcceptance(invite: InternalOutboundInvite<OutboundAdditionalData>): void {
         this.multiplexedBlindPeering.addOutboundInviteHandler(
             {
                 database: this.inviteDatabase,
