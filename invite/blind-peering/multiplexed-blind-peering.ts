@@ -6,13 +6,14 @@ import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./model.js";
 import b4a from 'b4a';
 import { decode, encode, type Codec } from "compact-encoding";
-import {Mutex} from 'async-mutex';
 import { SequentialRunner } from "./sequential-runner.js";
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>,
     database: IInviteDatabase<InboundPayload, OutboundPayload>,
-    updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>
+    updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
+    inboundCodec: Codec<InboundPayload>,
+    outboundCodec: Codec<OutboundPayload>
 }
 
 export type OutboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
@@ -127,7 +128,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         }
     }
 
-    async removeOutboundInviteHandler(discoveryKey: Uint8Array, purpose: string): void {
+    async removeOutboundInviteHandler(discoveryKey: Uint8Array, purpose: string): Promise<void> {
         const discoveryKeyHex = b4a.toString(discoveryKey, 'hex');
 
         const handlers = this.outboundHandlers[discoveryKeyHex];
@@ -141,19 +142,31 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 const [removed] = handlers.splice(purposeHandlerIndex, 1)
 
                 if (handlers.length === 0 && removed !== undefined) {
-                    await removed.member.close()
                     delete this.outboundHandlers[discoveryKeyHex];
+                    await removed.member.close()
                 }
             }
         }
     }
 
     addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        OutboundInviteHandlerOpts: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
+        inboundHandlerOpts: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
 
-        
+        const userData = encode(inboundHandlerOpts.inboundCodec, inboundHandlerOpts.invite.payload);
 
-        throw new Error('wip')
+        const candidate = this.blindPairing.addCandidate({
+            invite: inboundHandlerOpts.invite.invite,
+            userData: userData,
+            onadd( ) {
+                
+                // ???
+                
+            }
+        })        
+
+        // ???
+
+        return candidate;
     }
 
 }
