@@ -107,7 +107,11 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const outboundPayload = encode(outboundInviteHandlerOpts.outboundCodec, dbEntry.extraData);
 
         if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now()) {
-            candidate.confirm(outboundPayload)
+            candidate.confirm({
+                // TODO: add key to invite model in DB, etc
+                key: undefined,
+                additional: outboundPayload
+            })
         }
         else if (existingRedemption) {
             candidate.confirm(outboundPayload)
@@ -116,7 +120,11 @@ export class MultiplexedBlindPeering extends ReadyResource {
             candidate.deny({status: 2});
             return;
         } else {
-            candidate.confirm(outboundPayload)
+            candidate.confirm({
+                // TODO: add key to invite model in DB, etc
+                key: undefined,
+                additional: outboundPayload
+            })
             const remaining = dbEntry.remaining ? dbEntry.remaining - 1 : null;
             dbEntry.remaining = remaining;
 
@@ -157,7 +165,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const candidate = this.blindPairing.addCandidate({
             invite: inboundHandlerOpts.invite.invite,
             userData: userData,
-            onadd( ) {
+            onadd( result: { key: Uint8Array; encryptionKey: Uint8Array, additional: Uint8Array } ) {
                 
                 // ???
                 
