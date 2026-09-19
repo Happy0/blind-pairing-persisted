@@ -117,10 +117,10 @@ export class MultiplexedBlindPeering extends ReadyResource {
             const remaining = dbEntry.remaining ? dbEntry.remaining - 1 : null;
             dbEntry.remaining = remaining;
 
-            // TODO (robust): do these two in a batch / transaction
+            // TODO (robust): do these two in a batch / transaction at the database class level
             await outboundInviteHandlerOpts.database.upsertOutbound(dbEntry);
             await outboundInviteHandlerOpts.database.addInviteAcceptance(inviteId, sessionId)
-            
+
             await outboundInviteHandlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
         }
     }
