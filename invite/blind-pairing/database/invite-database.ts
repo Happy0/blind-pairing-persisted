@@ -138,7 +138,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         const item = await this.privateHyperbee.get(mappingKey)
 
         if (item !== null) {
-            // TODO (robust): batch
+            // TODO (robust): batch / transaction
             await this.privateHyperbee.del(item.value);
             await this.privateHyperbee.del(mappingKey);
         }
@@ -168,7 +168,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         const encodedRecord = encode(this.inboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
-        // TODO (perf): batch
+        // TODO (robust): batch / transaction
         await this.privateHyperbee.put(inviteKey, encodedRecord)
         await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
@@ -177,7 +177,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         const encodedRecord = encode(this.outboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
-        // TODO (perf): batch
+        // TODO (robust): batch / transaction
         await this.privateHyperbee.put(inviteKey, encodedRecord)
         await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
