@@ -1,12 +1,13 @@
 import ReadyResource from "ready-resource";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
-import { type InternalOutboundInvite, type InternalInboundInvite } from "./model.js";
+import { type InternalOutboundInvite, type InternalInboundInvite } from "./database/model/invite-model.js";
 import BlindPairing from "blind-pairing";
 import {string} from 'compact-encoding/index.js'
 import { encode, type Codec } from "compact-encoding";
 import b4a from 'b4a';
 import type { InboundInviteHandlerOpts, MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
+import { SequentialRunner } from "./sequential-runner.js";
 
 export type Invite = {
      invite: Uint8Array,
@@ -38,6 +39,8 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
 
     private inboundInviteCodec: Codec<InboundAdditionalData>;
     private outboundInviteCodec: Codec<OutboundAdditionalData>;
+
+    private sequentialRunner: SequentialRunner = new SequentialRunner();
 
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
@@ -116,12 +119,17 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
             }
 
         } else {
-            await this.inviteDatabase.deleteInvite(inviteId);
-            const discoveryKeyInUse = await this.inviteDatabase.hasActiveInviteWithDiscoveryKey(invite.discoveryKey)
+            const discoveryKeyHex = b4a.toString(invite.discoveryKey, 'hex');
 
-            if (!discoveryKeyInUse) {
-                await this.multiplexedBlindPeering.removeOutboundInviteHandler(invite.discoveryKey, invite.purpose);
-            }
+            // Sequence with the invite insert function
+            await this.sequentialRunner.runSequentiallyPerId(discoveryKeyHex, async () => {
+                await this.inviteDatabase.deleteInvite(inviteId);
+                const discoveryKeyInUse = await this.inviteDatabase.hasActiveInviteWithDiscoveryKey(invite.discoveryKey)
+
+                if (!discoveryKeyInUse) {
+                    await this.multiplexedBlindPeering.removeOutboundInviteHandler(invite.discoveryKey, invite.purpose);
+                }
+            })
         }
     }
 
@@ -157,8 +165,13 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
             remaining: count
         }
 
-        await this.inviteDatabase.upsertOutbound(outboundInvite);
-        this.listenForInviteAcceptance(outboundInvite);
+        const discoveryKeyHex = b4a.toString(invite.discoveryKey, 'hex');
+
+        // Sequence with the invite deletion function
+        await this.sequentialRunner.runSequentiallyPerId(discoveryKeyHex, async () => {
+            await this.inviteDatabase.upsertOutbound(outboundInvite)
+            this.listenForInviteAcceptance(outboundInvite);
+        });
 
         return outboundInvite;
     }

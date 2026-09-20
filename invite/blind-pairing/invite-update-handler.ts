@@ -1,4 +1,4 @@
-import type { InternalInboundInvite, InternalOutboundInvite } from "./model.js";
+import type { InternalInboundInvite, InternalOutboundInvite } from "./database/model/invite-model.js";
 
 
 export interface InviteUpdateHandler<InboundPayload, OutboundPayload> {

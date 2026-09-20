@@ -1,28 +1,16 @@
 import type { Codec } from "compact-encoding"
 import {encode, decode, string} from 'compact-encoding/index.js'
-import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec, createInviteCodec } from "../model.js"
+import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec, createInviteCodec } from "./model/invite-model.js"
 import Hyperbee from "hyperbee"
+import { discoveryKeyUsageCodec, type DiscoveryKeyUsages } from "./model/discovery-key-usage-model.js"
+import { SequentialRunner } from "../sequential-runner.js"
 
-export type InviteAcceptanceResult = {
-    outcome: 'added' | 'duplicate'
-}
-
-export type DiscoveryKeyUsages = {
-    purpose: string,
-    keys: Array<{
-        discoveryKey: Uint8Array,
-        count: number
-    }>,
-    lastExpiryMillisSinceEpoch: number
-}
 
 export interface IInviteDatabase<InboundPayload, OutboundPayload> {
     upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
-
-    getInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | InternalInboundInvite<InboundPayload> | null>
-
     deleteInvite(inviteId: string): Promise<void>
+    getInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | InternalInboundInvite<InboundPayload> | null>
 
     addInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>, sessionId: string): Promise<void>
     isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>;
@@ -46,6 +34,8 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
 
     private privateHyperbee: Hyperbee;
 
+    private discoveryKeyInfoCodec: Codec<DiscoveryKeyUsages> = discoveryKeyUsageCodec;
+
     /**
      * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
      * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
@@ -57,10 +47,16 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
 
         this.inviteCodec = createInviteCodec(inboundCodec, outboundCodec);
 
+
         this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
     }
 
     getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
+        const keyRange = getDiscoveryKeyListRange();
+
+        const stream = this.privateHyperbee.createReadStream({gt: keyRange.gt, let: keyRange.lt}, {reverse: true});
+
+
         throw new Error('wip');
     }
 
@@ -216,6 +212,17 @@ function getKey(invite: InternalInboundInvite<unknown> | InternalOutboundInvite<
 
 function getInviteAcceptanceKey(inviteId: string, sessionId: string): string {
     return `/invite_acceptance/${inviteId}/sessionId/${sessionId}`
+}
+
+function getDiscoveryKeyListRange() {
+    return {
+        gt: `/discoveryKey`,
+        lt: `/discoveryKey0`
+    }
+}
+
+function getDiscoveryKeyInfoKey(discoveryKey: string) {
+    return ""
 }
 
 function getKeyMappingKey(inviteId: string): string {

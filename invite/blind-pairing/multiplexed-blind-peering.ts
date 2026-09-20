@@ -3,7 +3,7 @@ import type Hyperswarm from "hyperswarm";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
-import type { InternalInboundInvite } from "./model.js";
+import type { InternalInboundInvite } from "./database/model/invite-model.js";
 import b4a from 'b4a';
 import { decode, encode, type Codec } from "compact-encoding";
 import { SequentialRunner } from "./sequential-runner.js";
@@ -110,7 +110,12 @@ export class MultiplexedBlindPeering extends ReadyResource {
             signature: dbEntry.additionalData.signature
         }
 
-        if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now() && !existingRedemption) {
+        if (!existingRedemption && dbEntry.remaining !== null && dbEntry.remaining === 0) {
+            candidate.deny({status: 2});
+            return;
+        }
+
+        else if (!existingRedemption && (!dbEntry.expiresMillisSinceEpoch || dbEntry.expiresMillisSinceEpoch > Date.now())) {
             candidate.confirm({
                 key: dbEntry.key,
                 additional: additional
@@ -127,9 +132,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 key: dbEntry.key,
                 additional: additional
             })
-        } else {
-            candidate.deny({status: 2});
-            return;
         }
     }
 
