@@ -1,5 +1,6 @@
 import type { Codec, State } from "compact-encoding"
 import {uint, uint8, string, buffer, fixed32} from 'compact-encoding/index.js'
+import { stat } from "node:fs";
 
 export type InviteId = string;
 
@@ -56,13 +57,71 @@ const statusCodec: Codec<InternalInboundInvite<unknown>['status']> = {
     }
 }
 
+function directionCodec<T extends 'inbound' | 'outbound'>(t: T): Codec<T> {
+    return {
+        preencode: function (state: State, value: "outbound" | "inbound"): void {
+            throw new Error("Function not implemented.");
+        },
+        encode: function (state: State, value: "outbound" | "inbound"): void {
+            throw new Error("Function not implemented.");
+        },
+        decode: function (state: State): T {
+            throw new Error("Function not implemented.");
+        }
+    }
+}
+
+const inboundCodec = directionCodec('inbound');
+const outboundCodec = directionCodec('outbound')
+
+export function createInviteCodec<InboundPayload, OutboundPayload>(
+    inboundCodec: Codec<InboundPayload>,
+    outboundCodec: Codec<OutboundPayload>): Codec<InternalInboundInvite<InboundPayload> | InternalOutboundInvite<OutboundPayload>> {
+
+        const inboundInviteCodec = createInboundInviteCodec(inboundCodec);
+        const outboundInviteCodec = createOutboundInviteCodec(outboundCodec); 
+
+        return {
+            decode(state: State): InternalInboundInvite<InboundPayload> | InternalOutboundInvite<OutboundPayload>  {
+                // the flags come first but we don't need them
+                uint.decode(state)
+                
+                const direction = string.decode(state)
+
+                state.start = 0;
+
+                if (direction === 'inbound') {
+                    return inboundInviteCodec.decode(state)
+                } else {
+                    return outboundInviteCodec.decode(state)
+                }
+            },
+            encode: (state: State, value: InternalInboundInvite<InboundPayload> | InternalOutboundInvite<OutboundPayload>): void => {
+                if (value.direction === 'inbound') {
+                    return inboundInviteCodec.encode(state, value);
+                } else {
+                    return outboundInviteCodec.encode(state, value);
+                }
+
+            },
+            preencode: (state: State, value: InternalInboundInvite<InboundPayload> | InternalOutboundInvite<OutboundPayload>): void => {
+                if (value.direction === 'inbound') {
+                    return inboundInviteCodec.preencode(state, value);
+                } else {
+                    return outboundInviteCodec.preencode(state, value);
+                }
+            }
+        }
+    }
+
+
 export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>): Codec<InternalInboundInvite<Payload>> {
     return {
         decode:(state: State): InternalInboundInvite<Payload> => {
             const flags = uint.decode(state)
 
             return {
-                direction: 'inbound',
+                direction: inboundCodec.decode(state),
                 purpose: string.decode(state),
                 inviteId: string.decode(state),
                 invite: buffer.decode(state),
@@ -74,6 +133,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
         },
         encode: (state: State, value: InternalInboundInvite<Payload>): void => {
             uint.encode(state, inboundFlags(value))
+            inboundCodec.encode(state, value.direction)
             string.encode(state, value.purpose)
             string.encode(state, value.inviteId)
             buffer.encode(state, value.invite)
@@ -84,6 +144,7 @@ export function createInboundInviteCodec<Payload>(payloadCodec: Codec<Payload>):
         },
         preencode: (state: State, value: InternalInboundInvite<Payload>): void => {
             uint.preencode(state, inboundFlags(value))
+            inboundCodec.preencode(state, value.direction)
             string.preencode(state, value.purpose)
             string.preencode(state, value.inviteId)
             buffer.preencode(state, value.invite)
@@ -101,7 +162,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             const flags = uint.decode(state)
 
             return {
-                direction: 'outbound',
+                direction: outboundCodec.decode(state),
                 purpose: string.decode(state),
                 inviteId: string.decode(state),
                 invite: buffer.decode(state),
@@ -120,6 +181,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
         },
         encode: (state: State, value: InternalOutboundInvite<Payload>): void => {
             uint.encode(state, outboundFlags(value))
+            outboundCodec.encode(state, value.direction)
             string.encode(state, value.purpose)
             string.encode(state, value.inviteId)
             buffer.encode(state, value.invite)
@@ -135,6 +197,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
         },
         preencode: (state: State, value: InternalOutboundInvite<Payload>): void => {
             uint.preencode(state, outboundFlags(value))
+            outboundCodec.preencode(state, value.direction),
             string.preencode(state, value.purpose)
             string.preencode(state, value.inviteId)
             buffer.preencode(state, value.invite)

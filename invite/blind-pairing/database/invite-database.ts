@@ -1,6 +1,6 @@
 import type { Codec } from "compact-encoding"
 import {encode, decode, string} from 'compact-encoding/index.js'
-import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec } from "../model.js"
+import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec, createInviteCodec } from "../model.js"
 import Hyperbee from "hyperbee"
 
 export type InviteAcceptanceResult = {
@@ -41,6 +41,9 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
     private inboundInviteCodec: Codec<InternalInboundInvite<InboundPayload>>;
     private outboundInviteCodec: Codec<InternalOutboundInvite<OutboundPayload>>;
+
+    private inviteCodec: Codec<InternalInboundInvite<InboundPayload> | InternalOutboundInvite<OutboundPayload>>;
+
     private privateHyperbee: Hyperbee;
 
     /**
@@ -51,6 +54,9 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
     constructor(privateHyperbee: Hyperbee, purpose: string, inboundCodec: Codec<InboundPayload>, outboundCodec: Codec<OutboundPayload>) {
         this.inboundInviteCodec = createInboundInviteCodec(inboundCodec);
         this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
+
+        this.inviteCodec = createInviteCodec(inboundCodec, outboundCodec);
+
         this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
     }
 
@@ -123,7 +129,7 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         // TODO: make Codec that can deal with both inbound + outbound
         //const result = decode(this.outboundInviteCodec, invite.value);
 
-        throw new Error('wip')
+        return decode(this.inviteCodec, item.value);
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
