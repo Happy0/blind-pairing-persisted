@@ -1,4 +1,4 @@
-import type { Codec } from "compact-encoding"
+import type { Codec, State } from "compact-encoding"
 
 export type DiscoveryKeyUsages = {
     purpose: string,
@@ -10,5 +10,13 @@ export type DiscoveryKeyUsages = {
 }
 
 export const discoveryKeyUsageCodec: Codec<DiscoveryKeyUsages> = {
-    
+    preencode: function (state: State, value: DiscoveryKeyUsages): void {
+        throw new Error("Function not implemented.")
+    },
+    encode: function (state: State, value: DiscoveryKeyUsages): void {
+        throw new Error("Function not implemented.")
+    },
+    decode: function (state: State): DiscoveryKeyUsages {
+        throw new Error("Function not implemented.")
+    }
 }

@@ -3,13 +3,8 @@ import {encode, decode, string} from 'compact-encoding/index.js'
 import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec, createInviteCodec } from "./model/invite-model.js"
 import Hyperbee from "hyperbee"
 import { discoveryKeyUsageCodec, type DiscoveryKeyUsages } from "./model/discovery-key-usage-model.js"
-import { SequentialRunner } from "../sequential-runner.js"
 
-
-export interface IInviteDatabase<InboundPayload, OutboundPayload> {
-    upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
-    upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
-    deleteInvite(inviteId: string): Promise<void>
+export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
     getInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | InternalInboundInvite<InboundPayload> | null>
 
     addInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>, sessionId: string): Promise<void>
@@ -24,6 +19,12 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
     getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages>;
 
     hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>;
+}
+
+export interface IInviteDatabase<InboundPayload, OutboundPayload> extends IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
+    upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
+    upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
+    deleteInvite(inviteId: string): Promise<void>
 };
 
 export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
