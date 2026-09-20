@@ -110,7 +110,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
             signature: dbEntry.additionalData.signature
         }
 
-        if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now()) {
+        if (dbEntry.expiresMillisSinceEpoch && dbEntry.expiresMillisSinceEpoch > Date.now() && !existingRedemption) {
             candidate.confirm({
                 key: dbEntry.key,
                 additional: additional
@@ -119,10 +119,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
             const remaining = dbEntry.remaining ? dbEntry.remaining - 1 : null;
             dbEntry.remaining = remaining;
 
-            // TODO (robust): do these two in a batch / transaction at the database class level
-            await outboundInviteHandlerOpts.database.upsertOutbound(dbEntry);
-            await outboundInviteHandlerOpts.database.addInviteAcceptance(inviteId, sessionId)
-
+            await outboundInviteHandlerOpts.database.addInviteAcceptance(dbEntry, sessionId)
             await outboundInviteHandlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
         }
         else if (existingRedemption) {

@@ -117,7 +117,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
 
         } else {
             await this.inviteDatabase.deleteInvite(inviteId);
-
             const discoveryKeyInUse = await this.inviteDatabase.hasActiveInviteWithDiscoveryKey(invite.discoveryKey)
 
             if (!discoveryKeyInUse) {

@@ -2,7 +2,6 @@ import type { Codec } from "compact-encoding"
 import {encode, decode, string} from 'compact-encoding/index.js'
 import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec } from "../model.js"
 import Hyperbee from "hyperbee"
-import b4a from 'b4a'
 
 export type InviteAcceptanceResult = {
     outcome: 'added' | 'duplicate'
@@ -25,7 +24,7 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> {
 
     deleteInvite(inviteId: string): Promise<void>
 
-    addInviteAcceptance(outboundInviteId: string, sessionId: string): Promise<InviteAcceptanceResult>
+    addInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>, sessionId: string): Promise<void>
     isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>;
 
     getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
@@ -146,20 +145,16 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         return existingItem !== null;
     }
 
-    async addInviteAcceptance(outboundInviteId: string, sessionId: string): Promise<InviteAcceptanceResult> {
-        const key = getInviteAcceptanceKey(outboundInviteId, sessionId);
-        const existingItem = await this.privateHyperbee.get(key);
+    async addInviteAcceptance(invite: InternalOutboundInvite<OutboundPayload>, sessionId: string): Promise<void> {
+        invite.count = invite.count ? invite.count - 1 : invite.count;
+
+        const inviteAcceptanceKey = getInviteAcceptanceKey(invite.inviteId, sessionId);
+        const existingItem = await this.privateHyperbee.get(inviteAcceptanceKey);
 
         if (existingItem === null) {
-            await this.privateHyperbee.put(key, encode(string, sessionId));
-
-            return {
-                outcome: 'added'
-            }
-        } else {
-            return {
-                outcome: 'duplicate'
-            }
+            // TODO (robust): do these in a batch / transaction
+            await this.upsertOutbound(invite)
+            await this.privateHyperbee.put(inviteAcceptanceKey, encode(string, sessionId));
         }
     }
 
