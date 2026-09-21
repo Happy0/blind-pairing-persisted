@@ -28,7 +28,7 @@ export type OutboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
 }
 
 type HandlerEntry = {
-    handlerOpts: OutboundInviteHandlerOpts<unknown, unknown>,
+    handlers: Array<OutboundInviteHandlerOpts<unknown, unknown>>,
     member: Member
 }
 
@@ -37,7 +37,9 @@ export class MultiplexedBlindPeering extends ReadyResource {
     private sequentialRunner: SequentialRunner;
 
     private blindPairing: BlindPairing;
-    private outboundHandlers: Record<string, Array<HandlerEntry>> = {}
+    private outboundHandlers: Record<string, HandlerEntry> = {}
+
+    private timerTask: NodeJS.Timeout | null = null;
 
     constructor(hyperswarm: Hyperswarm) {
         super();
@@ -48,20 +50,48 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
     protected override async _open(): Promise<void> {
         await this.blindPairing.ready();
+        this.timerTask = this.startCleanupTimerTask();
     }
 
     protected override async _close(): Promise<void> {
+        if (this.timerTask) {
+            clearInterval(this.timerTask);
+        }
+
         // TODO (robust): do we need to close each member/candidate ourselves?
         await this.blindPairing.close();
+    }
+
+    private startCleanupTimerTask(): NodeJS.Timeout {
+        const interval = setInterval(this.removeExpired, 60000);
+
+        return interval
+    }
+
+    private async removeExpired() {
+        const promises: Array<Promise<void>> = []
+
+        for (const [key, value] of Object.entries(this.outboundHandlers)) {
+            const activeEntries = value.handlers.some(
+                entry => entry.expiresMillisSinceEpoch === null || entry.expiresMillisSinceEpoch > Date.now()
+            );
+
+            if (!activeEntries) {
+                delete this.outboundHandlers[key];
+                const promise = value.member.close();
+                promises.push(promise);
+            }
+        }
+
+        await Promise.all(promises);
     }
 
     async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
         outboundInviteHandlerOpts: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<void> {
             const discoveryKeyHex = b4a.toString(outboundInviteHandlerOpts.discoveryKey);
             const handler = this.outboundHandlers[discoveryKeyHex]
-                ?.find(handler => handler.handlerOpts.purpose === outboundInviteHandlerOpts.purpose);
 
-            if (handler !== undefined) {
+            if (handler === undefined) {
                 const outer = this;
 
                 const m = this.blindPairing.addMember(
@@ -80,9 +110,11 @@ export class MultiplexedBlindPeering extends ReadyResource {
                     }
                 )
 
-                this.outboundHandlers[discoveryKeyHex] = [{member: m, handlerOpts: outboundInviteHandlerOpts}]
+                this.outboundHandlers[discoveryKeyHex] = {member: m, handlers: [outboundInviteHandlerOpts]}
 
                 await (m as any).flushed();
+            } else {
+                handler.handlers.push(outboundInviteHandlerOpts)
             }
     }
 
@@ -137,19 +169,19 @@ export class MultiplexedBlindPeering extends ReadyResource {
     async removeOutboundInviteHandler(discoveryKey: Uint8Array, purpose: string): Promise<void> {
         const discoveryKeyHex = b4a.toString(discoveryKey, 'hex');
 
-        const handlers = this.outboundHandlers[discoveryKeyHex];
+        const handlerEntry = this.outboundHandlers[discoveryKeyHex];
 
-        if (handlers === undefined) {
+        if (handlerEntry === undefined) {
             return;
         } else {
-            const purposeHandlerIndex = handlers.findIndex(handler => handler.handlerOpts.purpose === purpose);
+            const purposeHandlerIndex = handlerEntry.handlers.findIndex(handler => handler.purpose === purpose);
 
             if (purposeHandlerIndex > -1) {
-                const [removed] = handlers.splice(purposeHandlerIndex, 1)
+                const [removed] = handlerEntry.handlers.splice(purposeHandlerIndex, 1)
 
-                if (handlers.length === 0 && removed !== undefined) {
+                if (handlerEntry.handlers.length === 0 && removed !== undefined) {
                     delete this.outboundHandlers[discoveryKeyHex];
-                    await removed.member.close()
+                    await handlerEntry.member.close()
                 }
             }
         }
