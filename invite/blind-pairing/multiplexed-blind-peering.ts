@@ -114,7 +114,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
             candidate.deny({status: 2});
             return;
         }
-
         else if (!existingRedemption && (!dbEntry.expiresMillisSinceEpoch || dbEntry.expiresMillisSinceEpoch > Date.now())) {
             candidate.confirm({
                 key: dbEntry.key,

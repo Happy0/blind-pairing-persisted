@@ -2,7 +2,8 @@ import type { Codec } from "compact-encoding"
 import {encode, decode, string} from 'compact-encoding/index.js'
 import { type InternalOutboundInvite, type InternalInboundInvite, createOutboundInviteCodec, createInboundInviteCodec, createInviteCodec } from "./model/invite-model.js"
 import Hyperbee from "hyperbee"
-import { discoveryKeyUsageCodec, type DiscoveryKeyUsages } from "./model/discovery-key-usage-model.js"
+import { type DiscoveryKeyUsages } from "./model/discovery-key-usage-model.js"
+import b4a from 'b4a';
 
 export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
     getInvite(inviteId: string): Promise<InternalOutboundInvite<OutboundPayload> | InternalInboundInvite<InboundPayload> | null>
@@ -35,8 +36,6 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
 
     private privateHyperbee: Hyperbee;
 
-    private discoveryKeyInfoCodec: Codec<DiscoveryKeyUsages> = discoveryKeyUsageCodec;
-
     /**
      * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
      * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
@@ -52,17 +51,49 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
     }
 
-    getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
-        const keyRange = getDiscoveryKeyListRange();
+    async getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
+        // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
 
-        const stream = this.privateHyperbee.createReadStream({gt: keyRange.gt, let: keyRange.lt}, {reverse: true});
+        let lastExpiryMillisSinceEpoch : number | null = 0;
 
+        const keys: Record<string, {
+            discoveryKey: Uint8Array,
+            count: number
+        }> = {}
 
-        throw new Error('wip');
+        for await (const outboundInvite of this.getAllActiveOutbound()) {
+            const discoveryKeyHex = b4a.toString(outboundInvite.discoveryKey, 'hex');
+
+            const existing = keys[discoveryKeyHex];
+
+            if (existing) {
+                existing.count = existing.count + 1;
+            } else {
+                keys[discoveryKeyHex] = {
+                    count: 1,
+                    discoveryKey: outboundInvite.discoveryKey
+                }
+            }
+
+            lastExpiryMillisSinceEpoch = outboundInvite.expiresMillisSinceEpoch === null || lastExpiryMillisSinceEpoch === null
+                ? null
+                : Math.max(lastExpiryMillisSinceEpoch, outboundInvite.expiresMillisSinceEpoch); 
+        }
+
+        const result: DiscoveryKeyUsages = {
+            keys: Object.values(keys),
+            lastExpiryMillisSinceEpoch: lastExpiryMillisSinceEpoch
+        }
+
+        return result;
     }
 
-    hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
-        throw new Error('wip');
+    async hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
+        // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
+
+        const activeDiscoveryKeys = await this.getActiveDiscoveryKeys();
+
+        return activeDiscoveryKeys.keys.some(k => b4a.toString(k.discoveryKey, 'hex') === b4a.toString(key, 'hex'))
     }
 
     async *getAllActiveOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>> {
@@ -122,9 +153,6 @@ export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IIn
         if (invite === null) {
             return null;
         }
-
-        // TODO: make Codec that can deal with both inbound + outbound
-        //const result = decode(this.outboundInviteCodec, invite.value);
 
         return decode(this.inviteCodec, item.value);
     }
@@ -213,17 +241,6 @@ function getKey(invite: InternalInboundInvite<unknown> | InternalOutboundInvite<
 
 function getInviteAcceptanceKey(inviteId: string, sessionId: string): string {
     return `/invite_acceptance/${inviteId}/sessionId/${sessionId}`
-}
-
-function getDiscoveryKeyListRange() {
-    return {
-        gt: `/discoveryKey`,
-        lt: `/discoveryKey0`
-    }
-}
-
-function getDiscoveryKeyInfoKey(discoveryKey: string) {
-    return ""
 }
 
 function getKeyMappingKey(inviteId: string): string {

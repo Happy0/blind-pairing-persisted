@@ -27,7 +27,6 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
 }
 
 export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extends ReadyResource implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>  {
-
     private purpose: string;
     private inviteUpdateHandler: InviteUpdateHandler<InboundAdditionalData, OutboundAdditionalData>;
     private inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>;
@@ -75,7 +74,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
                     database: this.inviteDatabase,
                     discoveryKey: key.discoveryKey,
                     expiresMillisSinceEpoch: outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
-                    purpose: outboundDiscoveryKeys.purpose,
+                    purpose: this.purpose,
                     updateHandler: this.inviteUpdateHandler,
                     removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
                     inboundCodec: this.inboundInviteCodec,
@@ -97,7 +96,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
         const outboundDiscoveryKeys = await this.inviteDatabase.getActiveDiscoveryKeys();
 
         for (const key of outboundDiscoveryKeys.keys) {
-            this.multiplexedBlindPeering.removeOutboundInviteHandler(key.discoveryKey, outboundDiscoveryKeys.purpose);
+            this.multiplexedBlindPeering.removeOutboundInviteHandler(key.discoveryKey, this.purpose);
         }
 
     }
