@@ -3,7 +3,7 @@ import type { IInviteDatabase } from "./database/invite-database.js";
 import type { InviteUpdateHandler } from "./invite-update-handler.js";
 import { type InternalOutboundInvite, type InternalInboundInvite } from "./database/model/invite-model.js";
 import BlindPairing from "blind-pairing";
-import {string} from 'compact-encoding/index.js'
+import {string, type AddressInput} from 'compact-encoding/index.js'
 import { encode, type Codec } from "compact-encoding";
 import b4a from 'b4a';
 import type { InboundInviteHandlerOpts, MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
@@ -138,11 +138,15 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
         key: Uint8Array,
         count: number,
         expiresMillisSinceEpoch: number | null, 
-        payload: OutboundAdditionalData): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
+        payload: OutboundAdditionalData,
+        additionalNodes?: Array<AddressInput>): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
 
         const additionalData = encode(this.outboundInviteCodec, payload);
+
+        let opts: any = {data: additionalData};
+        opts = additionalNodes ? {...opts, additionalNodes: additionalNodes} : opts;
                 
-        const invite = BlindPairing.createInvite(key, {data: additionalData} )
+        const invite = BlindPairing.createInvite(key, opts)
         const inviteId = b4a.toString(invite.id, 'hex');
 
         // undefined if 'OutboundAdditionalData' is set to 'undefined' or null
