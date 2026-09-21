@@ -201,9 +201,9 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         await this.acceptInvite(inboundInvite);
     }
 
-    private acceptInvite(inbound: InternalInboundInvite<InboundAdditionalData>): void {
+    private async acceptInvite(inbound: InternalInboundInvite<InboundAdditionalData>): Promise<void> {
 
-        const resource = this.multiplexedBlindPeering.addInboundInviteHandler({
+        const resource = await this.multiplexedBlindPeering.addInboundInviteHandler({
             database: this.inviteDatabase,
             invite: inbound,
             updateHandler: this.inviteUpdateHandler,

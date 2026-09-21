@@ -187,8 +187,8 @@ export class MultiplexedBlindPeering extends ReadyResource {
         }
     }
 
-    addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        inboundHandlerOpts: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): ReadyResource {
+    async addInboundInviteHandler<InboundPayload, OutboundPayload>(
+        inboundHandlerOpts: InboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<ReadyResource> {
 
         const userData = encode(inboundHandlerOpts.inboundCodec, inboundHandlerOpts.invite.payload);
 
@@ -208,7 +208,14 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 
                 await candidate.close()
             }
-        })        
+        })
+
+        // TODO (robust): update holepunch typescript bindings to include 'pairing' promise field
+        candidate.pairing.catch ( async (_: unknown) =>  {
+            inboundHandlerOpts.invite.status = 'failed';
+            await inboundHandlerOpts.database.upsertInbound(inboundHandlerOpts.invite);
+            await inboundHandlerOpts.updateHandler.onInviteRejected(inboundHandlerOpts.invite);
+        })
         
         return candidate;
     }
