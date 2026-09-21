@@ -156,8 +156,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
             additionalData: additionalDataSignature ? {
                 data: payload,
-                // TODO (robust): don't coerce with !
-                signature: additionalDataSignature!
+                signature: additionalDataSignature
             } : undefined,
             invite: invite.invite,
             inviteId: inviteId,
