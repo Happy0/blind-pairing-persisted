@@ -28,7 +28,7 @@ export interface IInviteDatabase<InboundPayload, OutboundPayload> extends IReadO
     deleteInvite(inviteId: string): Promise<void>
 };
 
-export class BTreeInviteDatabase<OutboundPayload, InboundPayload> implements IInviteDatabase<InboundPayload, OutboundPayload> {
+export class BTreeInviteDatabase<InboundPayload, OutboundPayload extends {}> implements IInviteDatabase<InboundPayload, OutboundPayload> {
     private inboundInviteCodec: Codec<InternalInboundInvite<InboundPayload>>;
     private outboundInviteCodec: Codec<InternalOutboundInvite<OutboundPayload>>;
 

@@ -19,7 +19,7 @@ export type InternalOutboundInvite<Payload> = {
     additionalData: {
         data:  Payload,
         signature: Uint8Array
-    } | undefined
+    }
 }
 
 export type InternalInboundInvite<Payload> = {
@@ -36,7 +36,6 @@ export type InternalInboundInvite<Payload> = {
 const HAS_EXPIRES = 1
 const HAS_COUNT = 2
 const HAS_REMAINING = 4
-const HAS_ADDITIONAL_DATA = 8;
 
 const STATUSES = ['pending', 'complete', 'failed'] as const
 
@@ -173,10 +172,10 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
                 count: (flags & HAS_COUNT) ? uint.decode(state) : null,
                 remaining: (flags & HAS_REMAINING) ? uint.decode(state) : null,
                 expiresMillisSinceEpoch: (flags & HAS_EXPIRES) ? uint.decode(state) : null,
-                additionalData: flags & HAS_ADDITIONAL_DATA ? {
+                additionalData: {
                     data: payloadCodec.decode(state),
                     signature: fixed32.decode(state)
-                } : undefined
+                }
             }
         },
         encode: (state: State, value: InternalOutboundInvite<Payload>): void => {
@@ -221,6 +220,5 @@ function inboundFlags(value: InternalInboundInvite<unknown>): number {
 function outboundFlags(value: InternalOutboundInvite<unknown>): number {
     return (value.expiresMillisSinceEpoch !== null ? HAS_EXPIRES : 0) |
         (value.count !== null ? HAS_COUNT : 0) |
-        (value.remaining !== null ? HAS_REMAINING : 0) |
-        (value.additionalData ? HAS_ADDITIONAL_DATA : 0) 
+        (value.remaining !== null ? HAS_REMAINING : 0)
 }

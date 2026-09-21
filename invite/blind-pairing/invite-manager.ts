@@ -14,7 +14,7 @@ export type Invite = {
      purpose: string
 }
 
-export interface IInviteManager<InboundPayload, OutboundPayload> {
+export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
     createInvite(
         key: Uint8Array,
         count: number,
@@ -26,7 +26,7 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
     deleteInvite(inviteId: string): Promise<void>;
 }
 
-export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extends ReadyResource implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>  {
+export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends {}> extends ReadyResource implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>  {
     private purpose: string;
     private inviteUpdateHandler: InviteUpdateHandler<InboundAdditionalData, OutboundAdditionalData>;
     private inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>;
@@ -149,7 +149,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
         const invite = BlindPairing.createInvite(key, opts)
         const inviteId = b4a.toString(invite.id, 'hex');
 
-        // undefined if 'OutboundAdditionalData' is set to 'undefined' or null
         const additionalDataSignature = invite.additional?.signature;
 
         const outboundInvite: InternalOutboundInvite<OutboundAdditionalData> = {
@@ -158,10 +157,11 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
             direction: 'outbound',
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
-            additionalData: additionalDataSignature ? {
+            additionalData: {
                 data: payload,
-                signature: additionalDataSignature
-            } : undefined,
+                // Safe to coerce since OutboundAdditionalData must be non null/undefined
+                signature: additionalDataSignature!
+            },
             invite: invite.invite,
             inviteId: inviteId,
             key: key,
