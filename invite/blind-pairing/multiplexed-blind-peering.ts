@@ -105,10 +105,10 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const decodedInbound = decode(outboundInviteHandlerOpts.inboundCodec, payload);
 
         const existingRedemption = await outboundInviteHandlerOpts.database.isAlreadyUsed(inviteId, candidate.request.session);
-        const additional = {
+        const additional = dbEntry.additionalData ? {
             data: encode(outboundInviteHandlerOpts.outboundCodec, dbEntry.additionalData.data),
             signature: dbEntry.additionalData.signature
-        }
+        } : undefined;
 
         if (!existingRedemption && dbEntry.remaining !== null && dbEntry.remaining === 0) {
             candidate.deny({status: 2});

@@ -68,6 +68,8 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
         const inboundDiscoveryKeys = this.inviteDatabase.getAllActiveInbound();
         const outboundDiscoveryKeys = await this.inviteDatabase.getActiveDiscoveryKeys();
 
+        await this.multiplexedBlindPeering.ready();
+
         for (const key of outboundDiscoveryKeys.keys) {
             this.multiplexedBlindPeering.addOutboundInviteHandler(
                 {
@@ -143,6 +145,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
         const invite = BlindPairing.createInvite(key, {data: additionalData} )
         const inviteId = b4a.toString(invite.id, 'hex');
 
+        // undefined if 'OutboundAdditionalData' is set to 'undefined' or null
         const additionalDataSignature = invite.additional?.signature;
 
         const outboundInvite: InternalOutboundInvite<OutboundAdditionalData> = {
@@ -151,11 +154,11 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData> extend
             direction: 'outbound',
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
-            additionalData: {
+            additionalData: additionalDataSignature ? {
                 data: payload,
                 // TODO (robust): don't coerce with !
                 signature: additionalDataSignature!
-            },
+            } : undefined,
             invite: invite.invite,
             inviteId: inviteId,
             key: key,
