@@ -44,7 +44,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         super();
 
         this.sequentialRunner = new SequentialRunner();
-        this.blindPairing = new BlindPairing(hyperswarm, {poll: 20});
+        this.blindPairing = new BlindPairing(hyperswarm);
     }
 
     protected override async _open(): Promise<void> {
