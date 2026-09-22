@@ -148,13 +148,15 @@ export class BTreeInviteDatabase<InboundPayload, OutboundPayload extends {}> imp
             return null;
         }
 
-        const invite = await this.privateHyperbee.get(item.value)
+        const decodedKey = decode(string, item.value);
+
+        const invite = await this.privateHyperbee.get(decodedKey)
 
         if (invite === null) {
             return null;
         }
 
-        return decode(this.inviteCodec, item.value);
+        return decode(this.inviteCodec, invite.value);
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
@@ -204,7 +206,7 @@ export class BTreeInviteDatabase<InboundPayload, OutboundPayload extends {}> imp
 
         // TODO (robust): batch / transaction
         await this.privateHyperbee.put(inviteKey, encodedRecord)
-        await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
+        await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), encode(string,inviteKey))
     }
 
     async *getAllActiveInbound(): AsyncGenerator<InternalInboundInvite<InboundPayload>> {

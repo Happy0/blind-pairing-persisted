@@ -1,6 +1,5 @@
 import type { Codec, State } from "compact-encoding"
-import {uint, uint8, string, buffer, fixed32} from 'compact-encoding/index.js'
-import { stat } from "node:fs";
+import {uint, uint8, string, buffer, fixed32, fixed8, fixed64} from 'compact-encoding/index.js'
 
 export type InviteId = string;
 
@@ -59,13 +58,19 @@ const statusCodec: Codec<InternalInboundInvite<unknown>['status']> = {
 function directionCodec<T extends 'inbound' | 'outbound'>(t: T): Codec<T> {
     return {
         preencode: function (state: State, value: "outbound" | "inbound"): void {
-            throw new Error("Function not implemented.");
+            return string.preencode(state, value)
         },
         encode: function (state: State, value: "outbound" | "inbound"): void {
-            throw new Error("Function not implemented.");
+            return string.encode(state, value)
         },
         decode: function (state: State): T {
-            throw new Error("Function not implemented.");
+            const value = string.decode(state);
+
+            if (value === t) {
+                return t;
+            } else {
+                throw new Error(`Unexpected value: ${t}`);
+            }
         }
     }
 }
@@ -174,7 +179,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
                 expiresMillisSinceEpoch: (flags & HAS_EXPIRES) ? uint.decode(state) : null,
                 additionalData: {
                     data: payloadCodec.decode(state),
-                    signature: fixed32.decode(state)
+                    signature: fixed8.decode(state)
                 }
             }
         },
@@ -192,7 +197,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             if (value.remaining !== null) uint.encode(state, value.remaining)
             if (value.expiresMillisSinceEpoch !== null) uint.encode(state, value.expiresMillisSinceEpoch)
             if (value.additionalData) payloadCodec.encode(state, value.additionalData.data)
-            if (value.additionalData) fixed32.encode(state, value.additionalData.signature)
+            if (value.additionalData) fixed64.encode(state, value.additionalData.signature)
         },
         preencode: (state: State, value: InternalOutboundInvite<Payload>): void => {
             uint.preencode(state, outboundFlags(value))
@@ -208,7 +213,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
             if (value.remaining !== null) uint.preencode(state, value.remaining)
             if (value.expiresMillisSinceEpoch !== null) uint.preencode(state, value.expiresMillisSinceEpoch)
             if (value.additionalData) payloadCodec.preencode(state, value.additionalData.data)
-            if (value.additionalData) fixed32.preencode(state, value.additionalData.signature)
+            if (value.additionalData) fixed64.preencode(state, value.additionalData.signature)
         }
     }
 }
