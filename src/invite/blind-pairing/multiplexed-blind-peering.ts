@@ -21,7 +21,6 @@ export type OutboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     discoveryKey: Uint8Array,
     purpose: string,
     expiresMillisSinceEpoch: number | null,
-    removeInviteOnFullyUsed: boolean,
     database: IInviteDatabase<InboundPayload, OutboundPayload>,
     eventEmitter: EventEmitter<InviteUpdateEvent<InboundPayload, OutboundPayload>>,
     inboundCodec: Codec<InboundPayload>,

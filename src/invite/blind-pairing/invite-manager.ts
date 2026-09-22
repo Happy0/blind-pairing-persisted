@@ -38,8 +38,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
 
     private inboundInvites: Record<string, ReadyResource> = {};
 
-    private removeInviteOnFullyUsed: boolean;
-
     private inboundInviteCodec: Codec<InboundAdditionalData>;
     private outboundInviteCodec: Codec<OutboundAdditionalData>;
 
@@ -62,7 +60,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         this.inviteDatabase = inviteDatabase;
 
         this.multiplexedBlindPeering = multiplexedBlindPeering;
-        this.removeInviteOnFullyUsed = removeInviteOnFullyUsed;
 
         this.inboundInviteCodec = inboundCodec;
         this.outboundInviteCodec = outboundCodec;
@@ -82,7 +79,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
                     expiresMillisSinceEpoch: outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
                     purpose: this.purpose,
                     eventEmitter: this.events,
-                    removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
                     inboundCodec: this.inboundInviteCodec,
                     outboundCodec: this.outboundInviteCodec
                 }
@@ -229,7 +225,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
                 expiresMillisSinceEpoch: invite.expiresMillisSinceEpoch,
                 purpose: invite.purpose,
                 eventEmitter: this.events,
-                removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
                 inboundCodec: this.inboundInviteCodec,
                 outboundCodec: this.outboundInviteCodec
             }
