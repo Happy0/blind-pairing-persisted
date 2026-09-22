@@ -35,10 +35,9 @@ type HandlerEntry = {
 export class MultiplexedBlindPeering extends ReadyResource {
 
     private sequentialRunner: SequentialRunner;
-
     private blindPairing: BlindPairing;
+    
     private outboundHandlers: Record<string, HandlerEntry> = {}
-
     private timerTask: NodeJS.Timeout | null = null;
 
     constructor(hyperswarm: Hyperswarm) {
@@ -72,11 +71,15 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const promises: Array<Promise<void>> = []
 
         for (const [key, value] of Object.entries(this.outboundHandlers)) {
-            const activeEntries = value.handlers.some(
+            const activeEntries = value.handlers.filter(
                 entry => entry.expiresMillisSinceEpoch === null || entry.expiresMillisSinceEpoch > Date.now()
             );
 
-            if (!activeEntries) {
+            this.outboundHandlers[key] = {
+                member: value.member, handlers: activeEntries 
+            };
+
+            if (activeEntries.length === 0) {
                 delete this.outboundHandlers[key];
                 const promise = value.member.close();
                 promises.push(promise);
@@ -113,7 +116,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 this.outboundHandlers[discoveryKeyHex] = {member: m, handlers: [outboundInviteHandlerOpts]}
 
                 await (m as any).flushed();
-            } else {
+            } else if (!handler.handlers.some(x => x.purpose === outboundInviteHandlerOpts.purpose))  {
                 handler.handlers.push(outboundInviteHandlerOpts)
             }
     }
