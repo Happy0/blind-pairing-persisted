@@ -1,13 +1,14 @@
 import ReadyResource from "ready-resource";
 import type { IInviteDatabase } from "./database/invite-database.js";
-import type { InviteUpdateHandler } from "./invite-update-handler.js";
+import type { InviteUpdateEvent } from "./invite-update-handler.js";
 import { type InternalOutboundInvite, type InternalInboundInvite } from "./database/model/invite-model.js";
 import BlindPairing from "blind-pairing";
-import {string, type AddressInput} from 'compact-encoding/index.js'
+import {type AddressInput} from 'compact-encoding/index.js'
 import { encode, type Codec } from "compact-encoding";
 import b4a from 'b4a';
-import type { InboundInviteHandlerOpts, MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
+import type { MultiplexedBlindPeering } from "./multiplexed-blind-peering.js";
 import { SequentialRunner } from "./sequential-runner.js";
+import { EventEmitter } from "tseep";
 
 export type Invite = {
      invite: Uint8Array,
@@ -24,11 +25,16 @@ export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
     useInvite(InboundInvite: Invite, payload: InboundPayload): Promise<void>;
 
     deleteInvite(inviteId: string): Promise<void>;
+
+    events: EventEmitter<
+        InviteUpdateEvent<InboundPayload, OutboundPayload>
+    >
 }
 
-export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends {}> extends ReadyResource implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>  {
+export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends {}> 
+    extends ReadyResource
+    implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>  {
     private purpose: string;
-    private inviteUpdateHandler: InviteUpdateHandler<InboundAdditionalData, OutboundAdditionalData>;
     private inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>;
     private multiplexedBlindPeering: MultiplexedBlindPeering;
 
@@ -41,19 +47,21 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
 
     private sequentialRunner: SequentialRunner = new SequentialRunner();
 
+    public events: EventEmitter<
+        InviteUpdateEvent<InboundAdditionalData, OutboundAdditionalData>
+    > = new EventEmitter<InviteUpdateEvent<InboundAdditionalData, OutboundAdditionalData>>();
+
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
         purpose: string,
         removeInviteOnFullyUsed: boolean,
         inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>,
-        inviteUpdateHandler: InviteUpdateHandler<InboundAdditionalData, OutboundAdditionalData>,
         inboundCodec: Codec<InboundAdditionalData>,
         outboundCodec: Codec<OutboundAdditionalData>
     ) {
 
         super();
         this.purpose = purpose;
-        this.inviteUpdateHandler = inviteUpdateHandler;
         this.inviteDatabase = inviteDatabase;
 
         this.multiplexedBlindPeering = multiplexedBlindPeering;
@@ -61,7 +69,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
 
         this.inboundInviteCodec = inboundCodec;
         this.outboundInviteCodec = outboundCodec;
-
     }
 
     protected override async   _open(): Promise<void> {
@@ -77,7 +84,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
                     discoveryKey: key.discoveryKey,
                     expiresMillisSinceEpoch: outboundDiscoveryKeys.lastExpiryMillisSinceEpoch,
                     purpose: this.purpose,
-                    updateHandler: this.inviteUpdateHandler,
+                    eventEmitter: this.events,
                     removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
                     inboundCodec: this.inboundInviteCodec,
                     outboundCodec: this.outboundInviteCodec
@@ -206,7 +213,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         const resource = await this.multiplexedBlindPeering.addInboundInviteHandler({
             database: this.inviteDatabase,
             invite: inbound,
-            updateHandler: this.inviteUpdateHandler,
+            eventEmitter: this.events,
             inboundCodec: this.inboundInviteCodec,
             outboundCodec: this.outboundInviteCodec
         });
@@ -225,7 +232,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
                 discoveryKey: invite.discoveryKey,
                 expiresMillisSinceEpoch: invite.expiresMillisSinceEpoch,
                 purpose: invite.purpose,
-                updateHandler: this.inviteUpdateHandler,
+                eventEmitter: this.events,
                 removeInviteOnFullyUsed: this.removeInviteOnFullyUsed,
                 inboundCodec: this.inboundInviteCodec,
                 outboundCodec: this.outboundInviteCodec

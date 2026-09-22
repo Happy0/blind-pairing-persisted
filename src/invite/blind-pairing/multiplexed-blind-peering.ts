@@ -1,17 +1,18 @@
 import BlindPairing, { type Candidate, type Member } from "blind-pairing";
 import type Hyperswarm from "hyperswarm";
-import type { InviteUpdateHandler } from "./invite-update-handler.js";
+import type { InviteUpdateEvent } from "./invite-update-handler.js";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./database/model/invite-model.js";
 import b4a from 'b4a';
 import { decode, encode, type Codec } from "compact-encoding";
 import { SequentialRunner } from "./sequential-runner.js";
+import { EventEmitter } from "tseep";
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>,
     database: IInviteDatabase<InboundPayload, OutboundPayload>,
-    updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
+    eventEmitter: EventEmitter<InviteUpdateEvent<InboundPayload, OutboundPayload>>,
     inboundCodec: Codec<InboundPayload>,
     outboundCodec: Codec<OutboundPayload>
 }
@@ -22,7 +23,7 @@ export type OutboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     expiresMillisSinceEpoch: number | null,
     removeInviteOnFullyUsed: boolean,
     database: IInviteDatabase<InboundPayload, OutboundPayload>,
-    updateHandler: InviteUpdateHandler<InboundPayload, OutboundPayload>,
+    eventEmitter: EventEmitter<InviteUpdateEvent<InboundPayload, OutboundPayload>>,
     inboundCodec: Codec<InboundPayload>,
     outboundCodec: Codec<OutboundPayload>
 }
@@ -92,7 +93,9 @@ export class MultiplexedBlindPeering extends ReadyResource {
     async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
         outboundInviteHandlerOpts: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<void> {
             const discoveryKeyHex = b4a.toString(outboundInviteHandlerOpts.discoveryKey);
-            const handler = this.outboundHandlers[discoveryKeyHex]
+            const handler = this.outboundHandlers[discoveryKeyHex];
+
+            const _outboundInviteHandlerOpts = outboundInviteHandlerOpts as OutboundInviteHandlerOpts<unknown, unknown>;
 
             if (handler === undefined) {
                 const outer = this;
@@ -113,11 +116,11 @@ export class MultiplexedBlindPeering extends ReadyResource {
                     }
                 )
 
-                this.outboundHandlers[discoveryKeyHex] = {member: m, handlers: [outboundInviteHandlerOpts]}
+                this.outboundHandlers[discoveryKeyHex] = {member: m, handlers: [_outboundInviteHandlerOpts]}
 
                 await (m as any).flushed();
             } else if (!handler.handlers.some(x => x.purpose === outboundInviteHandlerOpts.purpose))  {
-                handler.handlers.push(outboundInviteHandlerOpts)
+                handler.handlers.push(_outboundInviteHandlerOpts)
             }
     }
 
@@ -159,7 +162,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
             dbEntry.remaining = remaining;
 
             await outboundInviteHandlerOpts.database.addInviteAcceptance(dbEntry, sessionId)
-            await outboundInviteHandlerOpts.updateHandler.onInviteAccepted(dbEntry, decodedInbound)
+            await outboundInviteHandlerOpts.eventEmitter.emit('inviteAccepted', dbEntry, decodedInbound);
         }
         else if (existingRedemption) {
             candidate.confirm({
@@ -203,11 +206,12 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 const decodedData = decode(inboundHandlerOpts.outboundCodec, result.data)
 
                 inboundHandlerOpts.invite.status = 'complete';
+                
                 await inboundHandlerOpts.database.upsertInbound(
                     inboundHandlerOpts.invite
                 )
 
-                await inboundHandlerOpts.updateHandler.onInviteConfirmed(inboundHandlerOpts.invite, decodedData)
+                inboundHandlerOpts.eventEmitter.emit('inviteConfirmed', inboundHandlerOpts.invite, decodedData);
                 
                 await candidate.close()
             }
@@ -217,7 +221,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         candidate.pairing.catch ( async (_: unknown) =>  {
             inboundHandlerOpts.invite.status = 'failed';
             await inboundHandlerOpts.database.upsertInbound(inboundHandlerOpts.invite);
-            await inboundHandlerOpts.updateHandler.onInviteRejected(inboundHandlerOpts.invite);
+            await inboundHandlerOpts.eventEmitter.emit('inviteRejected', inboundHandlerOpts.invite);
         })
         
         return candidate;
