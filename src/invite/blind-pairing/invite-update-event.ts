@@ -10,7 +10,7 @@ export type InviteUpdateEvent<InboundPayload, OutboundPayload> = {
     /**
      * Emitted when the inviter has confirmed that they have accepted our use of the invite.
      */
-    inviteConfirmed: (invite: InternalInboundInvite<InboundPayload>, payload: OutboundPayload) => void | Promise<void>;
+    inviteConfirmed: (invite: InternalInboundInvite<InboundPayload>, key: Uint8Array, payload: OutboundPayload) => void | Promise<void>;
 
     /**
      * Emitted when the invite has rejected our use of the invite (due to it already being used by another person, for example)

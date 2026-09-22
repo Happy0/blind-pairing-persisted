@@ -210,7 +210,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                     inboundHandlerOpts.invite
                 )
 
-                inboundHandlerOpts.eventEmitter.emit('inviteConfirmed', inboundHandlerOpts.invite, decodedData);
+                inboundHandlerOpts.eventEmitter.emit('inviteConfirmed', inboundHandlerOpts.invite, result.key, decodedData);
                 
                 await candidate.close()
             }
