@@ -91,6 +91,8 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
     }
 
     protected override async _close(): Promise<void> {
+        this.events.removeAllListeners();
+
         const incoming = Object.values(this.inboundInvites).map(invite => invite.close());
         await Promise.all(incoming);
 
@@ -99,7 +101,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         for (const key of outboundDiscoveryKeys.keys) {
             this.multiplexedBlindPeering.removeOutboundInviteHandler(key.discoveryKey, this.purpose);
         }
-
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
