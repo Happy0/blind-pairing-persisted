@@ -8,24 +8,21 @@ import Hyperbee from "hyperbee";
 import createTestnet from "hyperdht/testnet.js";
 
 export async function getTestnetHyperswarm(): Promise<Hyperswarm> {
-    const testnet = await createTestnet(10)
-    const bootstrap = testnet.bootstrap
 
-    const swarm = new Hyperswarm({ bootstrap })
+    const swarm = new Hyperswarm()
 
     return swarm;
 }
 
 export async function createTestManagerAndDb<Inbound, Outbound extends {}>(
     corestore: Corestore,
-    testHyperswarm: Hyperswarm,
     purpose: string,
     coreName: string,
     inboundCodec: Codec<Inbound>,
     outboundCodec: Codec<Outbound>
 ): Promise<{inviteManager: InviteManager<Inbound, Outbound>, db: IInviteDatabase<Inbound, Outbound>}> {
 
-    const mbp = new MultiplexedBlindPeering(testHyperswarm);
+    const mbp = new MultiplexedBlindPeering(await getTestnetHyperswarm());
 
     await corestore.ready();
     const hypercore = corestore.get({name: coreName});

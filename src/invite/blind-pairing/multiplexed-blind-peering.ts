@@ -44,7 +44,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         super();
 
         this.sequentialRunner = new SequentialRunner();
-        this.blindPairing = new BlindPairing(hyperswarm);
+        this.blindPairing = new BlindPairing(hyperswarm, {poll: 20});
     }
 
     protected override async _open(): Promise<void> {
@@ -62,15 +62,16 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     private startCleanupTimerTask(): NodeJS.Timeout {
-        const interval = setInterval(this.removeExpired, 60000);
+        const interval = setInterval(() => this.removeExpired(this.outboundHandlers), 60000);
 
         return interval
     }
 
-    private async removeExpired() {
+    private async removeExpired(outboundHandlers: Record<string, HandlerEntry>) {
         const promises: Array<Promise<void>> = []
 
-        for (const [key, value] of Object.entries(this.outboundHandlers)) {
+        // TODO: fix scoping issue of outboundHandlers here
+        for (const [key, value] of Object.entries(outboundHandlers)) {
             const activeEntries = value.handlers.filter(
                 entry => entry.expiresMillisSinceEpoch === null || entry.expiresMillisSinceEpoch > Date.now()
             );
@@ -91,7 +92,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
     async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
         outboundInviteHandlerOpts: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>): Promise<void> {
-            const discoveryKeyHex = b4a.toString(outboundInviteHandlerOpts.discoveryKey);
+            const discoveryKeyHex = b4a.toString(outboundInviteHandlerOpts.discoveryKey, 'hex');
             const handler = this.outboundHandlers[discoveryKeyHex];
 
             const _outboundInviteHandlerOpts = outboundInviteHandlerOpts as OutboundInviteHandlerOpts<unknown, unknown>;
@@ -106,7 +107,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                         async onadd (_candidate: Candidate) {
                             // TODO (robust): expand holepunch blind-peering typescript bindings
                             const candidate = _candidate as unknown as any;
-                            const inviteId = b4a.toString(candidate.request.inviteId, 'hex');
+                            const inviteId = b4a.toString(candidate.inviteId, 'hex');
 
                             await outer.sequentialRunner.runSequentiallyPerId(inviteId, async () =>
                                 outer.handleOutboundInviteAcceptance(inviteId, _candidate, outboundInviteHandlerOpts)
@@ -129,7 +130,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         outboundInviteHandlerOpts: OutboundInviteHandlerOpts<InboundPayload, OutboundPayload>
     ): Promise<void> {
         const candidate = _candidate as unknown as any;
-        const sessionId = candidate.request.session;
+        const sessionId = b4a.toString(candidate.requestData.session, 'hex');
 
         const dbEntry = await outboundInviteHandlerOpts.database.getInvite(inviteId);
 
@@ -141,17 +142,20 @@ export class MultiplexedBlindPeering extends ReadyResource {
         const payload = candidate.open(dbEntry.publicKey);
         const decodedInbound = decode(outboundInviteHandlerOpts.inboundCodec, payload);
 
-        const existingRedemption = await outboundInviteHandlerOpts.database.isAlreadyUsed(inviteId, candidate.request.session);
+        const existingRedemption = await outboundInviteHandlerOpts.database.isAlreadyUsed(inviteId, sessionId);
         const additional = dbEntry.additionalData ? {
             data: encode(outboundInviteHandlerOpts.outboundCodec, dbEntry.additionalData.data),
             signature: dbEntry.additionalData.signature
         } : undefined;
+
+        console.log(`signature is 2: ${b4a.toString(additional?.signature!, 'hex')}`)
 
         if (!existingRedemption && dbEntry.remaining !== null && dbEntry.remaining === 0) {
             candidate.deny({status: 2});
             return;
         }
         else if (!existingRedemption && (!dbEntry.expiresMillisSinceEpoch || dbEntry.expiresMillisSinceEpoch > Date.now())) {
+            console.log(`db key is: ${dbEntry.key}`)
             candidate.confirm({
                 key: dbEntry.key,
                 additional: additional
@@ -197,11 +201,20 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
         const userData = encode(inboundHandlerOpts.inboundCodec, inboundHandlerOpts.invite.payload);
 
+        console.log(`Invite handed to candidate is: ${b4a.toString(inboundHandlerOpts.invite.invite, 'hex')}`)
+
         // TODO (robust): update holepunch typescript bindings to include 'data' parameter
         const candidate = (this.blindPairing as any).addCandidate({
             invite: inboundHandlerOpts.invite.invite,
             userData: userData,
-            async onadd( result: { key: Uint8Array; encryptionKey: Uint8Array, data: Uint8Array } ) {
+            onadd: (result: any) => {
+                console.log(result);
+            }
+        })
+
+        // TODO (robust): update holepunch typescript bindings to include 'pairing' promise field
+        candidate.pairing
+        .then(async (result: any) => {
                 const decodedData = decode(inboundHandlerOpts.outboundCodec, result.data)
 
                 inboundHandlerOpts.invite.status = 'complete';
@@ -213,11 +226,8 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 inboundHandlerOpts.eventEmitter.emit('inviteConfirmed', inboundHandlerOpts.invite, result.key, decodedData);
                 
                 await candidate.close()
-            }
         })
-
-        // TODO (robust): update holepunch typescript bindings to include 'pairing' promise field
-        candidate.pairing.catch ( async (_: unknown) =>  {
+        .catch ( async (_: unknown) =>  {
             inboundHandlerOpts.invite.status = 'failed';
             await inboundHandlerOpts.database.upsertInbound(inboundHandlerOpts.invite);
             await inboundHandlerOpts.eventEmitter.emit('inviteRejected', inboundHandlerOpts.invite);

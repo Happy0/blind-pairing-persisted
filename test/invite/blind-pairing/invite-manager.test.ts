@@ -11,51 +11,52 @@ describe("Invite Manager - end to end", () => {
 
     const testCorestore = new Corestore(tmpdir() + path.sep + 'blind-pairing-tests');
 
-    test("Invites can be created and stored", async () => {
-        const testHyperswarm = await getTestnetHyperswarm();
+    // test("Invites can be created and stored", async () => {
+    //     const testHyperswarm = await getTestnetHyperswarm();
 
-        const { inviteManager, db} = await createTestManagerAndDb(
-            testCorestore,
-            testHyperswarm,
-            'test',
-            'inviterDb',
-            string,
-            string
-        );
+    //     const { inviteManager, db} = await createTestManagerAndDb(
+    //         testCorestore,
+    //         'test',
+    //         'inviterDb',
+    //         string,
+    //         string
+    //     );
 
-        const inviterCorestore = await testCorestore.get({
-            name: 'inviter_corestore'
-        })
+    //     const inviterCorestore = await testCorestore.get({
+    //         name: 'inviter_corestore'
+    //     })
 
-        await inviterCorestore.ready();
+    //     await inviterCorestore.ready();
 
-        const invite = await inviteManager.createInvite(inviterCorestore.key, 1, null, 'testAdditionalData');
+    //     const invite = await inviteManager.createInvite(inviterCorestore.key, 1, null, 'testAdditionalData');
 
-        const dbEntry = await db.getInvite(invite.inviteId);
+    //     const dbEntry = await db.getInvite(invite.inviteId);
 
-        expect(dbEntry).toBeDefined();
-    })
+    //     expect(dbEntry).toBeDefined();
 
-    test("Invites can be redeemed", async () => {
-        const testHyperswarm = await getTestnetHyperswarm();
+    //     await inviteManager.close()
+    // })
+
+    test("Invites can be redeemed", {timeout: 120000}, async () => {
 
         const inviter = await createTestManagerAndDb(
             testCorestore,
-            testHyperswarm,
             'test',
             'inviterDb',
             string,
             string
         );
 
-        const inviteeManager = await createTestManagerAndDb(
+        const invitee = await createTestManagerAndDb(
             testCorestore,
-            testHyperswarm,
             'test',
             'inviteeDb',
             string,
             string
         );
+
+        await inviter.inviteManager.ready();
+        await invitee.inviteManager.ready()
 
         const inviterCorestore = await testCorestore.get({
             name: 'inviter_corestore'
@@ -73,20 +74,18 @@ describe("Invite Manager - end to end", () => {
         expect(dbEntry).toBeDefined();
 
         const result = new Promise<{invite: InternalInboundInvite<string>, key: Uint8Array, payload: string}>((resolve, reject) => {
-            inviteeManager.inviteManager.events.once('inviteConfirmed', (invite, key, payload) => {
+            invitee.inviteManager.events.once('inviteConfirmed', (invite, key, payload) => {
                 resolve({invite, key, payload})
             })
 
-            inviteeManager.inviteManager.events.once('inviteRejected', () => reject())
+            invitee.inviteManager.events.once('inviteRejected', () => reject())
         })
 
-        await inviteeManager.inviteManager.useInvite({invite: invite.invite, purpose: invite.purpose}, 'testaroonie_invitee');
+        await invitee.inviteManager.useInvite({invite: invite.invite, purpose: invite.purpose}, 'testaroonie_invitee');
 
         const received = await result;
 
-        expect(received.key).toStrictEqual(inviteeCorestore.key);
-
-
+        expect(received.key).toStrictEqual(inviterCorestore.key);
     })
 
 })

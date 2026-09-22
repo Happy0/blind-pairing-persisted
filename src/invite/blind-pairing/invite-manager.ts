@@ -140,6 +140,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         payload: OutboundAdditionalData,
         additionalNodes?: Array<AddressInput>): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
 
+        // TODO: add expires
         const additionalData = encode(this.outboundInviteCodec, payload);
 
         let opts: any = {data: additionalData};
@@ -149,6 +150,13 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         const inviteId = b4a.toString(invite.id, 'hex');
 
         const additionalDataSignature = invite.additional?.signature;
+
+        console.log(`signature is: ${b4a.toString(additionalDataSignature!, 'hex')}`)
+
+        console.log(`key is ${key}`)
+
+                console.log(`Invite created is: ${b4a.toString(invite.invite, 'hex')}`)
+        
 
         const outboundInvite: InternalOutboundInvite<OutboundAdditionalData> = {
             count: count,
@@ -192,7 +200,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
             expiresMillisSinceEpoch: decodedInvite.expires,
             purpose: invite.purpose,
             status: 'pending',
-            inviteId: decodedInvite.id,
+            inviteId: b4a.toString(decodedInvite.id, 'hex'),
             payload: payload,
         }
 

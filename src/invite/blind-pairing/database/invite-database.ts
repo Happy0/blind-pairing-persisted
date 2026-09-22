@@ -223,7 +223,7 @@ export class BTreeInviteDatabase<InboundPayload, OutboundPayload extends {}> imp
     async *getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>> {
         const inviteRange = getInviteRange('inbound')
 
-        const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, let: inviteRange.lt}, {reverse: true});
+        const stream = this.privateHyperbee.createReadStream({gt: inviteRange.gt, lt: inviteRange.lt}, {reverse: true});
 
         for await (const entry of stream) {
             const encodedValue = (entry as any).value;

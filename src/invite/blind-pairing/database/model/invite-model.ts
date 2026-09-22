@@ -179,7 +179,7 @@ export function createOutboundInviteCodec<Payload>(payloadCodec: Codec<Payload>)
                 expiresMillisSinceEpoch: (flags & HAS_EXPIRES) ? uint.decode(state) : null,
                 additionalData: {
                     data: payloadCodec.decode(state),
-                    signature: fixed8.decode(state)
+                    signature: fixed64.decode(state)
                 }
             }
         },
