@@ -1,6 +1,6 @@
 import ReadyResource from "ready-resource";
 import type { IInviteDatabase } from "./database/invite-database.js";
-import type { InviteUpdateEvent } from "./invite-update-handler.js";
+import type { InviteUpdateEvent } from "./invite-update-event.js";
 import { type InternalOutboundInvite, type InternalInboundInvite } from "./database/model/invite-model.js";
 import BlindPairing from "blind-pairing";
 import {type AddressInput} from 'compact-encoding/index.js'
@@ -50,7 +50,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
     constructor(
         multiplexedBlindPeering: MultiplexedBlindPeering,
         purpose: string,
-        removeInviteOnFullyUsed: boolean,
         inviteDatabase: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>,
         inboundCodec: Codec<InboundAdditionalData>,
         outboundCodec: Codec<OutboundAdditionalData>

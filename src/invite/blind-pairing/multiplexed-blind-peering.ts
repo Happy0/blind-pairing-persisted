@@ -1,6 +1,6 @@
 import BlindPairing, { type Candidate, type Member } from "blind-pairing";
 import type Hyperswarm from "hyperswarm";
-import type { InviteUpdateEvent } from "./invite-update-handler.js";
+import type { InviteUpdateEvent } from "./invite-update-event.js";
 import type { IInviteDatabase } from "./database/invite-database.js";
 import ReadyResource from "ready-resource";
 import type { InternalInboundInvite } from "./database/model/invite-model.js";
