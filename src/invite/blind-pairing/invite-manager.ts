@@ -26,9 +26,7 @@ export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
 
     deleteInvite(inviteId: string): Promise<void>;
 
-    events: EventEmitter<
-        InviteUpdateEvent<InboundPayload, OutboundPayload>
-    >
+    events: EventEmitter<InviteUpdateEvent<InboundPayload, OutboundPayload>>;
 }
 
 export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends {}> 
@@ -59,7 +57,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         inboundCodec: Codec<InboundAdditionalData>,
         outboundCodec: Codec<OutboundAdditionalData>
     ) {
-
         super();
         this.purpose = purpose;
         this.inviteDatabase = inviteDatabase;
@@ -95,7 +92,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
         for await (const inbound of inboundDiscoveryKeys) {
             this.acceptInvite(inbound);
         }
-
     }
 
     protected override async _close(): Promise<void> {
