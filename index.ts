@@ -1,9 +1,6 @@
-import Corestore from 'corestore';
-import BlindPairing from 'blind-pairing';
+import Corestore from "corestore";
+import BlindPairing from "blind-pairing";
 
 function testaroonie() {
-
-    const x = new BlindPairing(null)
-
-
+  const x = new BlindPairing(null);
 }

@@ -7,13 +7,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "prettier": "prettier . --write"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
     "eslint": "^10.10.0",
     "holepunch-types": "^0.2.1",
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.9",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
