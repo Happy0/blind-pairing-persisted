@@ -5,7 +5,7 @@ import type { Codec } from "compact-encoding";
 import { BTreeInviteDatabase, type IInviteDatabase } from "../src/invite/blind-pairing/database/invite-database.js";
 import Corestore from "corestore";
 import Hyperbee from "hyperbee";
-import createTestnet from "hyperdht/testnet.js";
+import { randomBytes } from "node:crypto";
 
 export async function getTestnetHyperswarm(): Promise<Hyperswarm> {
 
@@ -14,18 +14,19 @@ export async function getTestnetHyperswarm(): Promise<Hyperswarm> {
     return swarm;
 }
 
-export async function createTestManagerAndDb<Inbound, Outbound extends {}>(
+export async function createTestDependencies<Inbound, Outbound extends {}>(
     corestore: Corestore,
     purpose: string,
-    coreName: string,
     inboundCodec: Codec<Inbound>,
     outboundCodec: Codec<Outbound>
-): Promise<{inviteManager: InviteManager<Inbound, Outbound>, db: IInviteDatabase<Inbound, Outbound>}> {
+): Promise<{inviteManager: InviteManager<Inbound, Outbound>, db: IInviteDatabase<Inbound, Outbound>, mbp: MultiplexedBlindPeering}> {
 
     const mbp = new MultiplexedBlindPeering(await getTestnetHyperswarm());
 
+    const randomCoreName = randomBytes(20).toString('hex');
+
     await corestore.ready();
-    const hypercore = corestore.get({name: coreName});
+    const hypercore = corestore.get({name: randomCoreName});
     await hypercore.ready();
 
     const hyperbee: Hyperbee = new Hyperbee(hypercore as any, {keyEncoding: 'utf-8', valueEncoding: 'binary'});
@@ -46,6 +47,6 @@ export async function createTestManagerAndDb<Inbound, Outbound extends {}>(
         outboundCodec
     )
 
-    return { inviteManager, db }
+    return { inviteManager, db, mbp }
 
 }

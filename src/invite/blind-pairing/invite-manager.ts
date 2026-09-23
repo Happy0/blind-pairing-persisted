@@ -181,7 +181,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData extends
 
         // Sequence with the invite deletion function
         await this.sequentialRunner.runSequentiallyPerId(discoveryKeyHex, async () => {
-            await this.inviteDatabase.upsertOutbound(outboundInvite)
+            await this.inviteDatabase.insertOutbound(outboundInvite)
             this.listenForInviteAcceptance(outboundInvite);
         });
 

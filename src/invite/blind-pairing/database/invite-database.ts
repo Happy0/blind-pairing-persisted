@@ -23,7 +23,7 @@ export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
 }
 
 export interface IInviteDatabase<InboundPayload, OutboundPayload> extends IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
-    upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
+    insertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void>
     upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
     deleteInvite(inviteId: string): Promise<void>
 };
@@ -186,7 +186,7 @@ export class BTreeInviteDatabase<InboundPayload, OutboundPayload extends {}> imp
 
         if (existingItem === null) {
             // TODO (robust): do these in a batch / transaction
-            await this.upsertOutbound(invite)
+            await this.insertOutbound(invite)
             await this.privateHyperbee.put(inviteAcceptanceKey, encode(string, sessionId));
         }
     }
@@ -200,7 +200,7 @@ export class BTreeInviteDatabase<InboundPayload, OutboundPayload extends {}> imp
         await this.privateHyperbee.put(getKeyMappingKey(invite.inviteId), inviteKey)
     }
 
-    async upsertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void> {
+    async insertOutbound(invite: InternalOutboundInvite<OutboundPayload>): Promise<void> {
         const encodedRecord = encode(this.outboundInviteCodec, invite)
         const inviteKey = getKey(invite)
 
