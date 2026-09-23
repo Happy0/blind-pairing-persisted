@@ -1,18 +1,20 @@
-import { expect, test, describe, afterAll, beforeAll } from 'vitest'
+import { expect, test, describe, afterAll, beforeAll, type Matcher, expectTypeOf } from 'vitest'
 import { createTestDependencies as createFreshTestDependencies, getTestnetHyperswarm } from "../../utils.js";
 import {string} from 'compact-encoding/index.js'
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Corestore from "corestore";
-import type { InternalInboundInvite } from '../../../src/invite/blind-pairing/database/model/invite-model.js';
+import type { InternalInboundInvite, InternalOutboundInvite } from '../../../src/invite/blind-pairing/database/model/invite-model.js';
 import { randomBytes } from 'node:crypto';
 import fs from 'fs';
+import { fail } from 'node:assert';
 
 describe("Invite Manager - end to end", () => {
 
     const testDataDir = tmpdir() + path.sep + 'blind-pairing-tests';
 
     const testCorestore = new Corestore(tmpdir() + path.sep + 'blind-pairing-tests');
+
 
     afterAll(async () => {
         await testCorestore.close();
@@ -42,7 +44,7 @@ describe("Invite Manager - end to end", () => {
         expect(dbEntry).toBeDefined();
     })
 
-    test("Invites can be redeemed", {timeout: 120000}, async () => {
+    test("Invites being redeemed reduces remaining count", {timeout: 120000}, async () => {
 
         const inviter = await createFreshTestDependencies(
             testCorestore,
@@ -70,6 +72,7 @@ describe("Invite Manager - end to end", () => {
         })
 
         await inviterCorestore.ready();
+        await inviteeCorestore.ready();
 
         const invite = await inviter.inviteManager.createInvite(inviterCorestore.key, 1, null, 'testAdditionalData');
         const dbEntry = await inviter.db.getInvite(invite.inviteId);
@@ -84,12 +87,28 @@ describe("Invite Manager - end to end", () => {
             invitee.inviteManager.events.once('inviteRejected', () => reject())
         })
 
-        await invitee.inviteManager.useInvite({invite: invite.invite, purpose: invite.purpose}, 'testaroonie_invitee');
+        await invitee.inviteManager.useInvite({invite: invite.invite, purpose: invite.purpose}, 'invitee_payload');
 
         const received = await result;
 
         expect(received.key).toStrictEqual(inviterCorestore.key);
+        expect(received.payload).toStrictEqual('testAdditionalData');
+
+        const newInviteState = await inviter.db.getInvite(invite.inviteId);
+
+        expect(newInviteState).toBeDefined()
+        expectOutboundInvite(invite)
+
+        expect(invite.remaining).toStrictEqual(0);
     })
+
+    function expectOutboundInvite<I, O>(invite: InternalInboundInvite<I> |  InternalOutboundInvite<O>): invite is InternalOutboundInvite<O> {
+        if (invite.direction === 'outbound') {
+            return true
+        } else {
+            fail('Not outbound invite as expected');
+        }
+    }
 
 })
 
