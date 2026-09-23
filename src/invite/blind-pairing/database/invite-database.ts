@@ -12,28 +12,35 @@ import { type DiscoveryKeyUsages } from './model/discovery-key-usage-model.js'
 import b4a from 'b4a'
 import BlindPairing from 'blind-pairing'
 
-export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
+export interface IReadOnlyInviteDatabase<
+    InboundAdditionalData,
+    OutboundAdditionalData,
+> {
     getInvite(
         inviteId: string
     ): Promise<
-        | InternalOutboundInvite<OutboundPayload>
-        | InternalInboundInvite<InboundPayload>
+        | InternalOutboundInvite<OutboundAdditionalData>
+        | InternalInboundInvite<InboundAdditionalData>
         | null
     >
 
     addInviteAcceptance(
-        invite: InternalOutboundInvite<OutboundPayload>,
+        invite: InternalOutboundInvite<OutboundAdditionalData>,
         sessionId: string
     ): Promise<void>
     isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>
 
-    getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
-    getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
+    getAllActiveInbound(): AsyncIterable<
+        InternalInboundInvite<InboundAdditionalData>
+    >
+    getAllInbound(): AsyncIterable<InternalInboundInvite<InboundAdditionalData>>
 
     getAllActiveOutbound(): AsyncIterable<
-        InternalOutboundInvite<OutboundPayload>
+        InternalOutboundInvite<OutboundAdditionalData>
     >
-    getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>
+    getAllOutbound(): AsyncIterable<
+        InternalOutboundInvite<OutboundAdditionalData>
+    >
 
     getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages>
 
@@ -42,13 +49,18 @@ export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
 }
 
 export interface IInviteDatabase<
-    InboundPayload,
-    OutboundPayload,
-> extends IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
+    InboundAdditionalData,
+    OutboundAdditionalData,
+> extends IReadOnlyInviteDatabase<
+    InboundAdditionalData,
+    OutboundAdditionalData
+> {
     insertOutbound(
-        invite: InternalOutboundInvite<OutboundPayload>
+        invite: InternalOutboundInvite<OutboundAdditionalData>
     ): Promise<void>
-    upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
+    upsertInbound(
+        invite: InternalInboundInvite<InboundAdditionalData>
+    ): Promise<void>
     deleteInvite(inviteId: string): Promise<void>
 }
 
@@ -84,13 +96,17 @@ export class BTreeInviteDatabase<
 
         this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`)
     }
-    
-    async hasActiveInboundInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
-        const targetKey = b4a.toString(key, 'hex');
+
+    async hasActiveInboundInviteWithDiscoveryKey(
+        key: Uint8Array
+    ): Promise<boolean> {
+        const targetKey = b4a.toString(key, 'hex')
 
         // TODO (perf): index in the database rather than iterating through everything
         for await (const inbound of this.getAllActiveInbound()) {
-            const { discoveryKey } = (BlindPairing as any).decodeInvite(inbound.invite)
+            const { discoveryKey } = (BlindPairing as any).decodeInvite(
+                inbound.invite
+            )
 
             const discoveryKeyHex = b4a.toString(discoveryKey)
 
@@ -99,7 +115,7 @@ export class BTreeInviteDatabase<
             }
         }
 
-        return false;
+        return false
     }
 
     async getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
@@ -150,7 +166,9 @@ export class BTreeInviteDatabase<
         return result
     }
 
-    async hasActiveOutboundInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
+    async hasActiveOutboundInviteWithDiscoveryKey(
+        key: Uint8Array
+    ): Promise<boolean> {
         // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
 
         const activeDiscoveryKeys = await this.getActiveDiscoveryKeys()

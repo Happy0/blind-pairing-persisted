@@ -1,15 +1,7 @@
-import {
-    expect,
-    test,
-    describe,
-    afterAll,
-    beforeAll,
-    type Matcher,
-    expectTypeOf,
-} from 'vitest'
+import { expect, test, describe } from 'vitest'
 import {
     createTestDependencies as createFreshTestDependencies,
-    getTestnetHyperswarm,
+    getTestnetHyperswarm as getTestnetBootstrap,
 } from '../../utils.js'
 import { string } from 'compact-encoding/index.js'
 import { tmpdir } from 'node:os'
@@ -20,7 +12,6 @@ import type {
     InternalOutboundInvite,
 } from '../../../src/invite/blind-pairing/database/model/invite-model.js'
 import { randomBytes } from 'node:crypto'
-import fs from 'fs'
 import { fail } from 'node:assert'
 
 describe('Invite Manager - end to end', () => {
@@ -29,7 +20,9 @@ describe('Invite Manager - end to end', () => {
 
     describe('Outbound invites', () => {
         test('Invites can be created and stored', async () => {
+            const dhtBootstrap = await getTestnetBootstrap()
             const { inviteManager, db } = await createFreshTestDependencies(
+                dhtBootstrap,
                 testCorestore,
                 'test',
                 string,
@@ -60,7 +53,10 @@ describe('Invite Manager - end to end', () => {
             'Invites being redeemed reduces remaining count',
             { timeout: 120000 },
             async () => {
+                const dhtBootstrap = await getTestnetBootstrap()
+
                 const inviter = await createFreshTestDependencies(
+                    dhtBootstrap,
                     testCorestore,
                     'test',
                     string,
@@ -68,6 +64,7 @@ describe('Invite Manager - end to end', () => {
                 )
 
                 const invitee = await createFreshTestDependencies(
+                    dhtBootstrap,
                     testCorestore,
                     'test',
                     string,
@@ -132,6 +129,16 @@ describe('Invite Manager - end to end', () => {
                 }
             }
         )
+
+        test('Outbound invite re-loaded from storage can be redeemed as expected', () => {})
+
+        test('Outbound invite is rejected if all invites have been used', () => {})
+
+        test('Outbound invite is rejected if it has expired', () => {})
+
+        test('Multiple outbound invites can be active', () => {})
+
+        test('When all outbound invites have expired, incoming invite handlers are removed', () => {})
     })
 
     function expectOutboundInvite<I, O>(

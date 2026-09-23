@@ -31,7 +31,10 @@ export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
         payload: OutboundPayload
     ): Promise<Invite>
 
-    useInvite(InboundInvite: Invite, payload: InboundPayload): Promise<Result<void, InviteUsageError>>
+    useInvite(
+        InboundInvite: Invite,
+        payload: InboundPayload
+    ): Promise<Result<void, InviteUsageError>>
 
     deleteInvite(inviteId: string): Promise<void>
 
@@ -236,59 +239,62 @@ export class InviteManager<
         // TODO (robust): add decode invite function to holepunch types
         const decodedInvite = (BlindPairing as any).decodeInvite(invite.invite)
 
-        const discoveryKeyHex = b4a.toString(decodedInvite.discoveryKey, 'hex');
+        const discoveryKeyHex = b4a.toString(decodedInvite.discoveryKey, 'hex')
 
-        return this.sequentialRunner.runSequentiallyPerId(discoveryKeyHex, async () => {
-            const existingInboundInvite = await this.inviteDatabase.hasActiveInboundInviteWithDiscoveryKey(decodedInvite.discoveryKey)
+        return this.sequentialRunner.runSequentiallyPerId(
+            discoveryKeyHex,
+            async () => {
+                const existingInboundInvite =
+                    await this.inviteDatabase.hasActiveInboundInviteWithDiscoveryKey(
+                        decodedInvite.discoveryKey
+                    )
 
-            if (existingInboundInvite) {
-                return Result.error({type: 'discovery_key_in_use'})
+                if (existingInboundInvite) {
+                    return Result.error({ type: 'discovery_key_in_use' })
+                }
+
+                const inboundInvite: InternalInboundInvite<InboundAdditionalData> =
+                    {
+                        createdAtMillisSinceEpoch: Date.now(),
+                        direction: 'inbound',
+                        invite: invite.invite,
+                        expiresMillisSinceEpoch: decodedInvite.expires,
+                        purpose: invite.purpose,
+                        status: 'pending',
+                        inviteId: b4a.toString(decodedInvite.id, 'hex'),
+                        payload: payload,
+                    }
+
+                await this.inviteDatabase.upsertInbound(inboundInvite)
+                await this.acceptInvite(inboundInvite)
+
+                return Result.ok()
             }
-
-            const inboundInvite: InternalInboundInvite<InboundAdditionalData> = {
-                createdAtMillisSinceEpoch: Date.now(),
-                direction: 'inbound',
-                invite: invite.invite,
-                expiresMillisSinceEpoch: decodedInvite.expires,
-                purpose: invite.purpose,
-                status: 'pending',
-                inviteId: b4a.toString(decodedInvite.id, 'hex'),
-                payload: payload,
-            }
-
-            await this.inviteDatabase.upsertInbound(inboundInvite)
-            await this.acceptInvite(inboundInvite)
-
-            return Result.ok()
-        })
-
+        )
     }
 
     private async acceptInvite(
         inbound: InternalInboundInvite<InboundAdditionalData>
     ): Promise<void> {
-
         // TODO (robust): expand blind pairing types
-        const { discoveryKey } = (BlindPairing as any).decodeInvite(inbound.invite)
+        const { discoveryKey } = (BlindPairing as any).decodeInvite(
+            inbound.invite
+        )
 
-
-            const resource =
-                await this.multiplexedBlindPeering.addInboundInviteHandler({
-                    database: this.inviteDatabase,
-                    invite: inbound,
-                    eventEmitter: this.events,
-                    inboundCodec: this.inboundInviteCodec,
-                    outboundCodec: this.outboundInviteCodec,
-                })
-
-            this.inboundInvites[inbound.inviteId] = resource
-
-            resource.on('close', () => {
-                delete this.inboundInvites[inbound.inviteId]
+        const resource =
+            await this.multiplexedBlindPeering.addInboundInviteHandler({
+                database: this.inviteDatabase,
+                invite: inbound,
+                eventEmitter: this.events,
+                inboundCodec: this.inboundInviteCodec,
+                outboundCodec: this.outboundInviteCodec,
             })
 
-  
-        
+        this.inboundInvites[inbound.inviteId] = resource
+
+        resource.on('close', () => {
+            delete this.inboundInvites[inbound.inviteId]
+        })
     }
 
     private listenForInviteAcceptance(

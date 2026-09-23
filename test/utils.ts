@@ -1,4 +1,4 @@
-import Hyperswarm from 'hyperswarm'
+import Hyperswarm, { type BootstrapNode } from 'hyperswarm'
 import { InviteManager } from '../src/invite/blind-pairing/invite-manager.js'
 import { MultiplexedBlindPeering } from '../src/invite/blind-pairing/multiplexed-blind-peering.js'
 import type { Codec } from 'compact-encoding'
@@ -9,14 +9,17 @@ import {
 import Corestore from 'corestore'
 import Hyperbee from 'hyperbee'
 import { randomBytes } from 'node:crypto'
+import createTestnet from 'hyperdht/testnet.js'
 
-export async function getTestnetHyperswarm(): Promise<Hyperswarm> {
-    const swarm = new Hyperswarm()
+export async function getTestnetHyperswarm(): Promise<Array<BootstrapNode>> {
+    const testnet = await createTestnet(10)
+    const bootstrap = testnet.bootstrap
 
-    return swarm
+    return [...bootstrap]
 }
 
 export async function createTestDependencies<Inbound, Outbound extends {}>(
+    bootstrap: Array<BootstrapNode>,
     corestore: Corestore,
     purpose: string,
     inboundCodec: Codec<Inbound>,
@@ -26,7 +29,9 @@ export async function createTestDependencies<Inbound, Outbound extends {}>(
     db: IInviteDatabase<Inbound, Outbound>
     mbp: MultiplexedBlindPeering
 }> {
-    const mbp = new MultiplexedBlindPeering(await getTestnetHyperswarm())
+    const mbp = new MultiplexedBlindPeering(
+        new Hyperswarm({ bootstrap: bootstrap })
+    )
 
     const randomCoreName = randomBytes(20).toString('hex')
 
