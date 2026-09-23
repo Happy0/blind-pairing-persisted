@@ -1,356 +1,362 @@
-import type { Codec } from "compact-encoding";
-import { encode, decode, string } from "compact-encoding/index.js";
+import type { Codec } from 'compact-encoding'
+import { encode, decode, string } from 'compact-encoding/index.js'
 import {
-  type InternalOutboundInvite,
-  type InternalInboundInvite,
-  createOutboundInviteCodec,
-  createInboundInviteCodec,
-  createInviteCodec,
-} from "./model/invite-model.js";
-import Hyperbee from "hyperbee";
-import { type DiscoveryKeyUsages } from "./model/discovery-key-usage-model.js";
-import b4a from "b4a";
+    type InternalOutboundInvite,
+    type InternalInboundInvite,
+    createOutboundInviteCodec,
+    createInboundInviteCodec,
+    createInviteCodec,
+} from './model/invite-model.js'
+import Hyperbee from 'hyperbee'
+import { type DiscoveryKeyUsages } from './model/discovery-key-usage-model.js'
+import b4a from 'b4a'
 
 export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
-  getInvite(
-    inviteId: string,
-  ): Promise<
-    | InternalOutboundInvite<OutboundPayload>
-    | InternalInboundInvite<InboundPayload>
-    | null
-  >;
+    getInvite(
+        inviteId: string
+    ): Promise<
+        | InternalOutboundInvite<OutboundPayload>
+        | InternalInboundInvite<InboundPayload>
+        | null
+    >
 
-  addInviteAcceptance(
-    invite: InternalOutboundInvite<OutboundPayload>,
-    sessionId: string,
-  ): Promise<void>;
-  isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>;
+    addInviteAcceptance(
+        invite: InternalOutboundInvite<OutboundPayload>,
+        sessionId: string
+    ): Promise<void>
+    isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>
 
-  getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>;
-  getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>;
+    getAllActiveInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
+    getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>>
 
-  getAllActiveOutbound(): AsyncIterable<
-    InternalOutboundInvite<OutboundPayload>
-  >;
-  getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>;
+    getAllActiveOutbound(): AsyncIterable<
+        InternalOutboundInvite<OutboundPayload>
+    >
+    getAllOutbound(): AsyncIterable<InternalOutboundInvite<OutboundPayload>>
 
-  getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages>;
+    getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages>
 
-  hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>;
+    hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>
 }
 
 export interface IInviteDatabase<
-  InboundPayload,
-  OutboundPayload,
+    InboundPayload,
+    OutboundPayload,
 > extends IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
-  insertOutbound(
-    invite: InternalOutboundInvite<OutboundPayload>,
-  ): Promise<void>;
-  upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>;
-  deleteInvite(inviteId: string): Promise<void>;
+    insertOutbound(
+        invite: InternalOutboundInvite<OutboundPayload>
+    ): Promise<void>
+    upsertInbound(invite: InternalInboundInvite<InboundPayload>): Promise<void>
+    deleteInvite(inviteId: string): Promise<void>
 }
 
 export class BTreeInviteDatabase<
-  InboundPayload,
-  OutboundPayload extends {},
+    InboundPayload,
+    OutboundPayload extends {},
 > implements IInviteDatabase<InboundPayload, OutboundPayload> {
-  private inboundInviteCodec: Codec<InternalInboundInvite<InboundPayload>>;
-  private outboundInviteCodec: Codec<InternalOutboundInvite<OutboundPayload>>;
+    private inboundInviteCodec: Codec<InternalInboundInvite<InboundPayload>>
+    private outboundInviteCodec: Codec<InternalOutboundInvite<OutboundPayload>>
 
-  private inviteCodec: Codec<
-    | InternalInboundInvite<InboundPayload>
-    | InternalOutboundInvite<OutboundPayload>
-  >;
+    private inviteCodec: Codec<
+        | InternalInboundInvite<InboundPayload>
+        | InternalOutboundInvite<OutboundPayload>
+    >
 
-  private privateHyperbee: Hyperbee;
+    private privateHyperbee: Hyperbee
 
-  /**
-   * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
-   * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
-   * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
-   */
-  constructor(
-    privateHyperbee: Hyperbee,
-    purpose: string,
-    inboundCodec: Codec<InboundPayload>,
-    outboundCodec: Codec<OutboundPayload>,
-  ) {
-    this.inboundInviteCodec = createInboundInviteCodec(inboundCodec);
-    this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec);
+    /**
+     * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
+     * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
+     * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
+     */
+    constructor(
+        privateHyperbee: Hyperbee,
+        purpose: string,
+        inboundCodec: Codec<InboundPayload>,
+        outboundCodec: Codec<OutboundPayload>
+    ) {
+        this.inboundInviteCodec = createInboundInviteCodec(inboundCodec)
+        this.outboundInviteCodec = createOutboundInviteCodec(outboundCodec)
 
-    this.inviteCodec = createInviteCodec(inboundCodec, outboundCodec);
+        this.inviteCodec = createInviteCodec(inboundCodec, outboundCodec)
 
-    this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`);
-  }
-
-  async getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
-    // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
-
-    let lastExpiryMillisSinceEpoch: number | null = 0;
-
-    const keys: Record<
-      string,
-      {
-        discoveryKey: Uint8Array;
-        count: number;
-      }
-    > = {};
-
-    for await (const outboundInvite of this.getAllActiveOutbound()) {
-      const discoveryKeyHex = b4a.toString(outboundInvite.discoveryKey, "hex");
-
-      const existing = keys[discoveryKeyHex];
-
-      if (existing) {
-        existing.count = existing.count + 1;
-      } else {
-        keys[discoveryKeyHex] = {
-          count: 1,
-          discoveryKey: outboundInvite.discoveryKey,
-        };
-      }
-
-      lastExpiryMillisSinceEpoch =
-        outboundInvite.expiresMillisSinceEpoch === null ||
-        lastExpiryMillisSinceEpoch === null
-          ? null
-          : Math.max(
-              lastExpiryMillisSinceEpoch,
-              outboundInvite.expiresMillisSinceEpoch,
-            );
+        this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`)
     }
 
-    const result: DiscoveryKeyUsages = {
-      keys: Object.values(keys),
-      lastExpiryMillisSinceEpoch: lastExpiryMillisSinceEpoch,
-    };
+    async getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
+        // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
 
-    return result;
-  }
+        let lastExpiryMillisSinceEpoch: number | null = 0
 
-  async hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
-    // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
+        const keys: Record<
+            string,
+            {
+                discoveryKey: Uint8Array
+                count: number
+            }
+        > = {}
 
-    const activeDiscoveryKeys = await this.getActiveDiscoveryKeys();
+        for await (const outboundInvite of this.getAllActiveOutbound()) {
+            const discoveryKeyHex = b4a.toString(
+                outboundInvite.discoveryKey,
+                'hex'
+            )
 
-    return activeDiscoveryKeys.keys.some(
-      (k) => b4a.toString(k.discoveryKey, "hex") === b4a.toString(key, "hex"),
-    );
-  }
+            const existing = keys[discoveryKeyHex]
 
-  async *getAllActiveOutbound(): AsyncIterable<
-    InternalOutboundInvite<OutboundPayload>
-  > {
-    const stream = this.getAllOutbound();
+            if (existing) {
+                existing.count = existing.count + 1
+            } else {
+                keys[discoveryKeyHex] = {
+                    count: 1,
+                    discoveryKey: outboundInvite.discoveryKey,
+                }
+            }
 
-    for await (const entry of stream) {
-      if (isNotExpired(entry)) {
-        yield entry;
-      }
-    }
-  }
+            lastExpiryMillisSinceEpoch =
+                outboundInvite.expiresMillisSinceEpoch === null ||
+                lastExpiryMillisSinceEpoch === null
+                    ? null
+                    : Math.max(
+                          lastExpiryMillisSinceEpoch,
+                          outboundInvite.expiresMillisSinceEpoch
+                      )
+        }
 
-  async *getAllOutbound(): AsyncIterable<
-    InternalOutboundInvite<OutboundPayload>
-  > {
-    const inviteRange = getInviteRange("outbound");
+        const result: DiscoveryKeyUsages = {
+            keys: Object.values(keys),
+            lastExpiryMillisSinceEpoch: lastExpiryMillisSinceEpoch,
+        }
 
-    const stream = this.privateHyperbee.createReadStream(
-      { gt: inviteRange.gt, let: inviteRange.lt },
-      { reverse: true },
-    );
-
-    for await (const entry of stream) {
-      const encodedValue = (entry as any).value;
-      const item = decode(this.outboundInviteCodec, encodedValue);
-
-      yield item;
-    }
-  }
-
-  async getInboundInvite(
-    inviteId: string,
-  ): Promise<InternalInboundInvite<InboundPayload> | null> {
-    const mappingKey = getKeyMappingKey(inviteId);
-
-    const item = await this.privateHyperbee.get(mappingKey);
-
-    if (item === null) {
-      return null;
+        return result
     }
 
-    const invite = await this.privateHyperbee.get(item.value);
+    async hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
+        // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
 
-    if (invite === null) {
-      return null;
+        const activeDiscoveryKeys = await this.getActiveDiscoveryKeys()
+
+        return activeDiscoveryKeys.keys.some(
+            (k) =>
+                b4a.toString(k.discoveryKey, 'hex') === b4a.toString(key, 'hex')
+        )
     }
 
-    const result = decode(this.inboundInviteCodec, invite.value);
+    async *getAllActiveOutbound(): AsyncIterable<
+        InternalOutboundInvite<OutboundPayload>
+    > {
+        const stream = this.getAllOutbound()
 
-    return result;
-  }
-
-  async getInvite(
-    inviteId: string,
-  ): Promise<
-    | InternalOutboundInvite<OutboundPayload>
-    | InternalInboundInvite<InboundPayload>
-    | null
-  > {
-    const mappingKey = getKeyMappingKey(inviteId);
-
-    const item = await this.privateHyperbee.get(mappingKey);
-
-    if (item === null) {
-      return null;
+        for await (const entry of stream) {
+            if (isNotExpired(entry)) {
+                yield entry
+            }
+        }
     }
 
-    const decodedKey = decode(string, item.value);
+    async *getAllOutbound(): AsyncIterable<
+        InternalOutboundInvite<OutboundPayload>
+    > {
+        const inviteRange = getInviteRange('outbound')
 
-    const invite = await this.privateHyperbee.get(decodedKey);
+        const stream = this.privateHyperbee.createReadStream(
+            { gt: inviteRange.gt, let: inviteRange.lt },
+            { reverse: true }
+        )
 
-    if (invite === null) {
-      return null;
+        for await (const entry of stream) {
+            const encodedValue = (entry as any).value
+            const item = decode(this.outboundInviteCodec, encodedValue)
+
+            yield item
+        }
     }
 
-    return decode(this.inviteCodec, invite.value);
-  }
+    async getInboundInvite(
+        inviteId: string
+    ): Promise<InternalInboundInvite<InboundPayload> | null> {
+        const mappingKey = getKeyMappingKey(inviteId)
 
-  async deleteInvite(inviteId: string): Promise<void> {
-    const mappingKey = getKeyMappingKey(inviteId);
+        const item = await this.privateHyperbee.get(mappingKey)
 
-    const item = await this.privateHyperbee.get(mappingKey);
+        if (item === null) {
+            return null
+        }
 
-    if (item !== null) {
-      // TODO (robust): batch / transaction
-      await this.privateHyperbee.del(item.value);
-      await this.privateHyperbee.del(mappingKey);
+        const invite = await this.privateHyperbee.get(item.value)
+
+        if (invite === null) {
+            return null
+        }
+
+        const result = decode(this.inboundInviteCodec, invite.value)
+
+        return result
     }
-  }
 
-  async isAlreadyUsed(
-    outboundInviteId: string,
-    sessionId: string,
-  ): Promise<boolean> {
-    const key = getInviteAcceptanceKey(outboundInviteId, sessionId);
-    const existingItem = await this.privateHyperbee.get(key);
+    async getInvite(
+        inviteId: string
+    ): Promise<
+        | InternalOutboundInvite<OutboundPayload>
+        | InternalInboundInvite<InboundPayload>
+        | null
+    > {
+        const mappingKey = getKeyMappingKey(inviteId)
 
-    return existingItem !== null;
-  }
+        const item = await this.privateHyperbee.get(mappingKey)
 
-  async addInviteAcceptance(
-    invite: InternalOutboundInvite<OutboundPayload>,
-    sessionId: string,
-  ): Promise<void> {
-    invite.count = invite.count ? invite.count - 1 : invite.count;
+        if (item === null) {
+            return null
+        }
 
-    const inviteAcceptanceKey = getInviteAcceptanceKey(
-      invite.inviteId,
-      sessionId,
-    );
-    const existingItem = await this.privateHyperbee.get(inviteAcceptanceKey);
+        const decodedKey = decode(string, item.value)
 
-    if (existingItem === null) {
-      // TODO (robust): do these in a batch / transaction
-      await this.insertOutbound(invite);
-      await this.privateHyperbee.put(
-        inviteAcceptanceKey,
-        encode(string, sessionId),
-      );
+        const invite = await this.privateHyperbee.get(decodedKey)
+
+        if (invite === null) {
+            return null
+        }
+
+        return decode(this.inviteCodec, invite.value)
     }
-  }
 
-  async upsertInbound(
-    invite: InternalInboundInvite<InboundPayload>,
-  ): Promise<void> {
-    const encodedRecord = encode(this.inboundInviteCodec, invite);
-    const inviteKey = getKey(invite);
+    async deleteInvite(inviteId: string): Promise<void> {
+        const mappingKey = getKeyMappingKey(inviteId)
 
-    // TODO (robust): batch / transaction
-    await this.privateHyperbee.put(inviteKey, encodedRecord);
-    await this.privateHyperbee.put(
-      getKeyMappingKey(invite.inviteId),
-      inviteKey,
-    );
-  }
+        const item = await this.privateHyperbee.get(mappingKey)
 
-  async insertOutbound(
-    invite: InternalOutboundInvite<OutboundPayload>,
-  ): Promise<void> {
-    const encodedRecord = encode(this.outboundInviteCodec, invite);
-    const inviteKey = getKey(invite);
-
-    // TODO (robust): batch / transaction
-    await this.privateHyperbee.put(inviteKey, encodedRecord);
-    await this.privateHyperbee.put(
-      getKeyMappingKey(invite.inviteId),
-      encode(string, inviteKey),
-    );
-  }
-
-  async *getAllActiveInbound(): AsyncGenerator<
-    InternalInboundInvite<InboundPayload>
-  > {
-    const stream = this.getAllInbound();
-
-    for await (const item of stream) {
-      if (
-        (isNotExpired(item) && item.status !== "complete") ||
-        item.status !== "failed"
-      ) {
-        yield item;
-      }
+        if (item !== null) {
+            // TODO (robust): batch / transaction
+            await this.privateHyperbee.del(item.value)
+            await this.privateHyperbee.del(mappingKey)
+        }
     }
-  }
 
-  async *getAllInbound(): AsyncIterable<InternalInboundInvite<InboundPayload>> {
-    const inviteRange = getInviteRange("inbound");
+    async isAlreadyUsed(
+        outboundInviteId: string,
+        sessionId: string
+    ): Promise<boolean> {
+        const key = getInviteAcceptanceKey(outboundInviteId, sessionId)
+        const existingItem = await this.privateHyperbee.get(key)
 
-    const stream = this.privateHyperbee.createReadStream(
-      { gt: inviteRange.gt, lt: inviteRange.lt },
-      { reverse: true },
-    );
-
-    for await (const entry of stream) {
-      const encodedValue = (entry as any).value;
-      const item = decode(this.inboundInviteCodec, encodedValue);
-
-      if (
-        (isNotExpired(item) && item.status !== "complete") ||
-        item.status !== "failed"
-      ) {
-        yield item;
-      }
+        return existingItem !== null
     }
-  }
+
+    async addInviteAcceptance(
+        invite: InternalOutboundInvite<OutboundPayload>,
+        sessionId: string
+    ): Promise<void> {
+        invite.count = invite.count ? invite.count - 1 : invite.count
+
+        const inviteAcceptanceKey = getInviteAcceptanceKey(
+            invite.inviteId,
+            sessionId
+        )
+        const existingItem = await this.privateHyperbee.get(inviteAcceptanceKey)
+
+        if (existingItem === null) {
+            // TODO (robust): do these in a batch / transaction
+            await this.insertOutbound(invite)
+            await this.privateHyperbee.put(
+                inviteAcceptanceKey,
+                encode(string, sessionId)
+            )
+        }
+    }
+
+    async upsertInbound(
+        invite: InternalInboundInvite<InboundPayload>
+    ): Promise<void> {
+        const encodedRecord = encode(this.inboundInviteCodec, invite)
+        const inviteKey = getKey(invite)
+
+        // TODO (robust): batch / transaction
+        await this.privateHyperbee.put(inviteKey, encodedRecord)
+        await this.privateHyperbee.put(
+            getKeyMappingKey(invite.inviteId),
+            inviteKey
+        )
+    }
+
+    async insertOutbound(
+        invite: InternalOutboundInvite<OutboundPayload>
+    ): Promise<void> {
+        const encodedRecord = encode(this.outboundInviteCodec, invite)
+        const inviteKey = getKey(invite)
+
+        // TODO (robust): batch / transaction
+        await this.privateHyperbee.put(inviteKey, encodedRecord)
+        await this.privateHyperbee.put(
+            getKeyMappingKey(invite.inviteId),
+            encode(string, inviteKey)
+        )
+    }
+
+    async *getAllActiveInbound(): AsyncGenerator<
+        InternalInboundInvite<InboundPayload>
+    > {
+        const stream = this.getAllInbound()
+
+        for await (const item of stream) {
+            if (
+                (isNotExpired(item) && item.status !== 'complete') ||
+                item.status !== 'failed'
+            ) {
+                yield item
+            }
+        }
+    }
+
+    async *getAllInbound(): AsyncIterable<
+        InternalInboundInvite<InboundPayload>
+    > {
+        const inviteRange = getInviteRange('inbound')
+
+        const stream = this.privateHyperbee.createReadStream(
+            { gt: inviteRange.gt, lt: inviteRange.lt },
+            { reverse: true }
+        )
+
+        for await (const entry of stream) {
+            const encodedValue = (entry as any).value
+            const item = decode(this.inboundInviteCodec, encodedValue)
+
+            if (
+                (isNotExpired(item) && item.status !== 'complete') ||
+                item.status !== 'failed'
+            ) {
+                yield item
+            }
+        }
+    }
 }
 
 function getKey(
-  invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>,
+    invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>
 ): string {
-  return `/invites/${invite.direction}/createdAt/${invite.createdAtMillisSinceEpoch}/${invite.inviteId}`;
+    return `/invites/${invite.direction}/createdAt/${invite.createdAtMillisSinceEpoch}/${invite.inviteId}`
 }
 
 function getInviteAcceptanceKey(inviteId: string, sessionId: string): string {
-  return `/invite_acceptance/${inviteId}/sessionId/${sessionId}`;
+    return `/invite_acceptance/${inviteId}/sessionId/${sessionId}`
 }
 
 function getKeyMappingKey(inviteId: string): string {
-  return `/invite_key_mapping/${inviteId}`;
+    return `/invite_key_mapping/${inviteId}`
 }
 
 function isNotExpired(
-  invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>,
+    invite: InternalInboundInvite<unknown> | InternalOutboundInvite<unknown>
 ): Boolean {
-  return (
-    invite.expiresMillisSinceEpoch == null ||
-    invite.expiresMillisSinceEpoch > Date.now()
-  );
+    return (
+        invite.expiresMillisSinceEpoch == null ||
+        invite.expiresMillisSinceEpoch > Date.now()
+    )
 }
 
-function getInviteRange(direction: "outbound" | "inbound") {
-  return {
-    gt: `/invites/${direction}/createdAt`,
-    lt: `/invites/${direction}/createdAt0`,
-  };
+function getInviteRange(direction: 'outbound' | 'inbound') {
+    return {
+        gt: `/invites/${direction}/createdAt`,
+        lt: `/invites/${direction}/createdAt0`,
+    }
 }
