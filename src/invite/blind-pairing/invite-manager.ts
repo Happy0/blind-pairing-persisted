@@ -12,10 +12,15 @@ import b4a from 'b4a'
 import type { MultiplexedBlindPeering } from './multiplexed-blind-peering.js'
 import { SequentialRunner } from './sequential-runner.js'
 import { EventEmitter } from 'tseep'
+import { Result } from 'typescript-result'
 
 export type Invite = {
     invite: Uint8Array
     purpose: string
+}
+
+export type InviteUsageError = {
+    type: 'discovery_key_in_use'
 }
 
 export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
@@ -26,7 +31,7 @@ export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
         payload: OutboundPayload
     ): Promise<Invite>
 
-    useInvite(InboundInvite: Invite, payload: InboundPayload): Promise<void>
+    useInvite(InboundInvite: Invite, payload: InboundPayload): Promise<Result<void, InviteUsageError>>
 
     deleteInvite(inviteId: string): Promise<void>
 
@@ -148,7 +153,7 @@ export class InviteManager<
                 async () => {
                     await this.inviteDatabase.deleteInvite(inviteId)
                     const discoveryKeyInUse =
-                        await this.inviteDatabase.hasActiveInviteWithDiscoveryKey(
+                        await this.inviteDatabase.hasActiveOutboundInviteWithDiscoveryKey(
                             invite.discoveryKey
                         )
 
@@ -227,42 +232,63 @@ export class InviteManager<
     async useInvite(
         invite: Invite,
         payload: InboundAdditionalData
-    ): Promise<void> {
+    ): Promise<Result<void, InviteUsageError>> {
         // TODO (robust): add decode invite function to holepunch types
         const decodedInvite = (BlindPairing as any).decodeInvite(invite.invite)
 
-        const inboundInvite: InternalInboundInvite<InboundAdditionalData> = {
-            createdAtMillisSinceEpoch: Date.now(),
-            direction: 'inbound',
-            invite: invite.invite,
-            expiresMillisSinceEpoch: decodedInvite.expires,
-            purpose: invite.purpose,
-            status: 'pending',
-            inviteId: b4a.toString(decodedInvite.id, 'hex'),
-            payload: payload,
-        }
+        const discoveryKeyHex = b4a.toString(decodedInvite.discoveryKey, 'hex');
 
-        await this.inviteDatabase.upsertInbound(inboundInvite)
-        await this.acceptInvite(inboundInvite)
+        return this.sequentialRunner.runSequentiallyPerId(discoveryKeyHex, async () => {
+            const existingInboundInvite = await this.inviteDatabase.hasActiveInboundInviteWithDiscoveryKey(decodedInvite.discoveryKey)
+
+            if (existingInboundInvite) {
+                return Result.error({type: 'discovery_key_in_use'})
+            }
+
+            const inboundInvite: InternalInboundInvite<InboundAdditionalData> = {
+                createdAtMillisSinceEpoch: Date.now(),
+                direction: 'inbound',
+                invite: invite.invite,
+                expiresMillisSinceEpoch: decodedInvite.expires,
+                purpose: invite.purpose,
+                status: 'pending',
+                inviteId: b4a.toString(decodedInvite.id, 'hex'),
+                payload: payload,
+            }
+
+            await this.inviteDatabase.upsertInbound(inboundInvite)
+            await this.acceptInvite(inboundInvite)
+
+            return Result.ok()
+        })
+
     }
 
     private async acceptInvite(
         inbound: InternalInboundInvite<InboundAdditionalData>
     ): Promise<void> {
-        const resource =
-            await this.multiplexedBlindPeering.addInboundInviteHandler({
-                database: this.inviteDatabase,
-                invite: inbound,
-                eventEmitter: this.events,
-                inboundCodec: this.inboundInviteCodec,
-                outboundCodec: this.outboundInviteCodec,
+
+        // TODO (robust): expand blind pairing types
+        const { discoveryKey } = (BlindPairing as any).decodeInvite(inbound.invite)
+
+
+            const resource =
+                await this.multiplexedBlindPeering.addInboundInviteHandler({
+                    database: this.inviteDatabase,
+                    invite: inbound,
+                    eventEmitter: this.events,
+                    inboundCodec: this.inboundInviteCodec,
+                    outboundCodec: this.outboundInviteCodec,
+                })
+
+            this.inboundInvites[inbound.inviteId] = resource
+
+            resource.on('close', () => {
+                delete this.inboundInvites[inbound.inviteId]
             })
 
-        this.inboundInvites[inbound.inviteId] = resource
-
-        resource.on('close', () => {
-            delete this.inboundInvites[inbound.inviteId]
-        })
+  
+        
     }
 
     private listenForInviteAcceptance(

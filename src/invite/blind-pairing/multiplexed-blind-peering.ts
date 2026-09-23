@@ -281,10 +281,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
             inboundHandlerOpts.invite.payload
         )
 
-        console.log(
-            `Invite handed to candidate is: ${b4a.toString(inboundHandlerOpts.invite.invite, 'hex')}`
-        )
-
         // TODO (robust): update holepunch typescript bindings to include 'data' parameter
         const candidate = (this.blindPairing as any).addCandidate({
             invite: inboundHandlerOpts.invite.invite,

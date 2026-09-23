@@ -10,6 +10,7 @@ import {
 import Hyperbee from 'hyperbee'
 import { type DiscoveryKeyUsages } from './model/discovery-key-usage-model.js'
 import b4a from 'b4a'
+import BlindPairing from 'blind-pairing'
 
 export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
     getInvite(
@@ -36,7 +37,8 @@ export interface IReadOnlyInviteDatabase<InboundPayload, OutboundPayload> {
 
     getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages>
 
-    hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>
+    hasActiveOutboundInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>
+    hasActiveInboundInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean>
 }
 
 export interface IInviteDatabase<
@@ -81,6 +83,23 @@ export class BTreeInviteDatabase<
         this.inviteCodec = createInviteCodec(inboundCodec, outboundCodec)
 
         this.privateHyperbee = privateHyperbee.sub(`inviteDb-${purpose}`)
+    }
+    
+    async hasActiveInboundInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
+        const targetKey = b4a.toString(key, 'hex');
+
+        // TODO (perf): index in the database rather than iterating through everything
+        for await (const inbound of this.getAllActiveInbound()) {
+            const { discoveryKey } = (BlindPairing as any).decodeInvite(inbound.invite)
+
+            const discoveryKeyHex = b4a.toString(discoveryKey)
+
+            if (targetKey === discoveryKeyHex) {
+                return true
+            }
+        }
+
+        return false;
     }
 
     async getActiveDiscoveryKeys(): Promise<DiscoveryKeyUsages> {
@@ -131,7 +150,7 @@ export class BTreeInviteDatabase<
         return result
     }
 
-    async hasActiveInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
+    async hasActiveOutboundInviteWithDiscoveryKey(key: Uint8Array): Promise<boolean> {
         // TODO (perf): Do bookkeeping in a separate Db entry rather than go through all entries
 
         const activeDiscoveryKeys = await this.getActiveDiscoveryKeys()
