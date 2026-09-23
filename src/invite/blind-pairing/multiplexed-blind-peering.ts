@@ -11,6 +11,7 @@ import { EventEmitter } from 'tseep'
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>
+    discoveryKey: Uint8Array
     database: IInviteDatabase<InboundPayload, OutboundPayload>
     eventEmitter: EventEmitter<
         InviteUpdateEvent<InboundPayload, OutboundPayload>
@@ -31,16 +32,23 @@ export type OutboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     outboundCodec: Codec<OutboundPayload>
 }
 
-type HandlerEntry = {
+type OutboundHandlerEntry = {
     handlers: Array<OutboundInviteHandlerOpts<unknown, unknown>>
     member: Member
+}
+
+type InboundHandlerEntry = {
+    queue: Array<InboundInviteHandlerOpts<unknown, unknown>>
+    current: Candidate
 }
 
 export class MultiplexedBlindPeering extends ReadyResource {
     private sequentialRunner: SequentialRunner
     private blindPairing: BlindPairing
 
-    private outboundHandlers: Record<string, HandlerEntry> = {}
+    private outboundHandlers: Record<string, OutboundHandlerEntry> = {}
+    private inboundHandlers: Record<string, InboundHandlerEntry> = {}
+
     private timerTask: NodeJS.Timeout | null = null
 
     constructor(hyperswarm: Hyperswarm) {
@@ -74,7 +82,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
     }
 
     private async removeExpired(
-        outboundHandlers: Record<string, HandlerEntry>
+        outboundHandlers: Record<string, OutboundHandlerEntry>
     ) {
         const promises: Array<Promise<void>> = []
 
@@ -276,51 +284,84 @@ export class MultiplexedBlindPeering extends ReadyResource {
             OutboundPayload
         >
     ): Promise<ReadyResource> {
-        const userData = encode(
-            inboundHandlerOpts.inboundCodec,
-            inboundHandlerOpts.invite.payload
+        const discoveryKeyHex = b4a.toString(
+            inboundHandlerOpts.discoveryKey,
+            'hex'
         )
 
-        // TODO (robust): update holepunch typescript bindings to include 'data' parameter
-        const candidate = (this.blindPairing as any).addCandidate({
-            invite: inboundHandlerOpts.invite.invite,
-            userData: userData
-        })
+        // TODO: add to map if there's no entries for the discovery key, otherwise enqueue
 
-        // TODO (robust): update holepunch typescript bindings to include 'pairing' promise field
-        candidate.pairing
-            .then(async (result: any) => {
-                const decodedData = decode(
-                    inboundHandlerOpts.outboundCodec,
-                    result.data
+        return this.sequentialRunner.runSequentiallyPerId(
+            discoveryKeyHex,
+            async () => {
+                const userData = encode(
+                    inboundHandlerOpts.inboundCodec,
+                    inboundHandlerOpts.invite.payload
                 )
 
-                inboundHandlerOpts.invite.status = 'complete'
+                const existingEntry = this.inboundHandlers[discoveryKeyHex]
 
-                await inboundHandlerOpts.database.upsertInbound(
-                    inboundHandlerOpts.invite
-                )
+                if (!existingEntry) {
+                    // TODO (robust): update holepunch typescript bindings to include 'data' parameter
+                    const candidate = (this.blindPairing as any).addCandidate({
+                        invite: inboundHandlerOpts.invite.invite,
+                        userData: userData,
+                    })
 
-                inboundHandlerOpts.eventEmitter.emit(
-                    'inviteConfirmed',
-                    inboundHandlerOpts.invite,
-                    result.key,
-                    decodedData
-                )
+                    this.inboundHandlers[discoveryKeyHex] = {
+                        current: candidate,
+                        queue: [],
+                    }
 
-                await candidate.close()
-            })
-            .catch(async (_: unknown) => {
-                inboundHandlerOpts.invite.status = 'failed'
-                await inboundHandlerOpts.database.upsertInbound(
-                    inboundHandlerOpts.invite
-                )
-                await inboundHandlerOpts.eventEmitter.emit(
-                    'inviteRejected',
-                    inboundHandlerOpts.invite
-                )
-            })
+                    // TODO (robust): update holepunch typescript bindings to include 'pairing' promise field
+                    candidate.pairing
+                        .then(async (result: any) => {
+                            const decodedData = decode(
+                                inboundHandlerOpts.outboundCodec,
+                                result.data
+                            )
 
-        return candidate
+                            inboundHandlerOpts.invite.status = 'complete'
+
+                            await inboundHandlerOpts.database.upsertInbound(
+                                inboundHandlerOpts.invite
+                            )
+
+                            inboundHandlerOpts.eventEmitter.emit(
+                                'inviteConfirmed',
+                                inboundHandlerOpts.invite,
+                                result.key,
+                                decodedData
+                            )
+
+                            await candidate.close()
+                        })
+                        .catch(async (_: unknown) => {
+                            inboundHandlerOpts.invite.status = 'failed'
+                            await inboundHandlerOpts.database.upsertInbound(
+                                inboundHandlerOpts.invite
+                            )
+                            await inboundHandlerOpts.eventEmitter.emit(
+                                'inviteRejected',
+                                inboundHandlerOpts.invite
+                            )
+                        })
+
+                    return candidate
+                } else {
+                    // TODO: handle dequeuing and processing next entry once current entry has been processed
+
+                    existingEntry.queue.push(
+                        inboundHandlerOpts as InboundInviteHandlerOpts<
+                            unknown,
+                            unknown
+                        >
+                    )
+                }
+            }
+        )
+
+        
     }
+
 }
