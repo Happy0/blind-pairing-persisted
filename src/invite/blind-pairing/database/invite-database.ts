@@ -55,7 +55,7 @@ export interface IInviteDatabase<
     InboundAdditionalData,
     OutboundAdditionalData
 > {
-    insertOutbound(
+    upsertOutbound(
         invite: InternalOutboundInvite<OutboundAdditionalData>
     ): Promise<void>
     upsertInbound(
@@ -293,7 +293,7 @@ export class BTreeInviteDatabase<
 
         if (existingItem === null) {
             // TODO (robust): do these in a batch / transaction
-            await this.insertOutbound(invite)
+            await this.upsertOutbound(invite)
             await this.privateHyperbee.put(
                 inviteAcceptanceKey,
                 encode(string, sessionId)
@@ -315,7 +315,7 @@ export class BTreeInviteDatabase<
         )
     }
 
-    async insertOutbound(
+    async upsertOutbound(
         invite: InternalOutboundInvite<OutboundPayload>
     ): Promise<void> {
         const encodedRecord = encode(this.outboundInviteCodec, invite)

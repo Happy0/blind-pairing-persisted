@@ -224,7 +224,7 @@ export class InviteManager<
         await this.sequentialRunner.runSequentiallyPerId(
             discoveryKeyHex,
             async () => {
-                await this.inviteDatabase.insertOutbound(outboundInvite)
+                await this.inviteDatabase.upsertOutbound(outboundInvite)
                 this.listenForInviteAcceptance(outboundInvite)
             }
         )

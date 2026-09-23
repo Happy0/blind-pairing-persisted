@@ -284,10 +284,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         // TODO (robust): update holepunch typescript bindings to include 'data' parameter
         const candidate = (this.blindPairing as any).addCandidate({
             invite: inboundHandlerOpts.invite.invite,
-            userData: userData,
-            onadd: (result: any) => {
-                console.log(result)
-            },
+            userData: userData
         })
 
         // TODO (robust): update holepunch typescript bindings to include 'pairing' promise field

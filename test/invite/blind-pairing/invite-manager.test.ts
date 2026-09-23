@@ -139,6 +139,28 @@ describe('Invite Manager - end to end', () => {
         test('Multiple outbound invites can be active', () => {})
 
         test('When all outbound invites have expired, incoming invite handlers are removed', () => {})
+
+        test('Outbound invite can use object with compact-encoding serialiser for additional data', () => {})
+
+        test('Outbound invite is accepted if it has already been redeemed (without decrementing usages)', () => {
+
+        })
+    })
+
+    describe('Inbound invites', () => {
+
+        test("Invite can be redeemed", () => {
+
+        })
+
+        test("Invite rejection triggers event", () => {
+
+        })
+
+        test("Multiple invites with the same discovery key results in an error", () => {
+            
+        })
+
     })
 
     function expectOutboundInvite<I, O>(
