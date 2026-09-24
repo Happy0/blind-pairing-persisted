@@ -9,7 +9,7 @@ import BlindPairing from 'blind-pairing'
 import { type AddressInput } from 'compact-encoding/index.js'
 import { encode, type Codec } from 'compact-encoding'
 import b4a from 'b4a'
-import type { MultiplexedBlindPeering } from './multiplexed-blind-peering.js'
+import type { MultiplexedBlindPeering } from './multiplexed-blind-pairing.js'
 import { SequentialRunner } from './sequential-runner.js'
 import { EventEmitter } from 'tseep'
 

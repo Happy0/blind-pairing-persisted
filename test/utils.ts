@@ -1,6 +1,6 @@
 import Hyperswarm, { type BootstrapNode } from 'hyperswarm'
 import { InviteManager } from '../src/invite/blind-pairing/invite-manager.js'
-import { MultiplexedBlindPeering } from '../src/invite/blind-pairing/multiplexed-blind-peering.js'
+import { MultiplexedBlindPeering } from '../src/invite/blind-pairing/multiplexed-blind-pairing.js'
 import type { Codec } from 'compact-encoding'
 import {
     BTreeInviteDatabase,

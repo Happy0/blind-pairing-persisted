@@ -234,6 +234,10 @@ describe('Invite Manager - end to end', () => {
 
         })
 
+        test("Expired inbound invites are not added to blind pairing at invite manager load", () => {
+            
+        })
+
     })
 
     function expectOutboundInvite<I, O>(

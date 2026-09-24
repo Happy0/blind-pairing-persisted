@@ -305,7 +305,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
             (!dbEntry.expiresMillisSinceEpoch ||
                 dbEntry.expiresMillisSinceEpoch > Date.now())
         ) {
-            console.log(`db key is: ${dbEntry.key}`)
             candidate.confirm({
                 key: dbEntry.key,
                 additional: additional,
