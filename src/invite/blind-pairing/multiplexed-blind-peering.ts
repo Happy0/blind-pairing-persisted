@@ -62,6 +62,143 @@ export class MultiplexedBlindPeering extends ReadyResource {
         this.blindPairing = new BlindPairing(hyperswarm)
     }
 
+       public async removeOutboundInviteHandler(
+        discoveryKey: Uint8Array,
+        purpose: string
+    ): Promise<void> {
+        const discoveryKeyHex = b4a.toString(discoveryKey, 'hex')
+
+        const handlerEntry = this.outboundHandlers[discoveryKeyHex]
+
+        if (handlerEntry === undefined) {
+            return
+        } else {
+            const purposeHandlerIndex = handlerEntry.handlers.findIndex(
+                (handler) => handler.purpose === purpose
+            )
+
+            if (purposeHandlerIndex > -1) {
+                const [removed] = handlerEntry.handlers.splice(
+                    purposeHandlerIndex,
+                    1
+                )
+
+                if (
+                    handlerEntry.handlers.length === 0 &&
+                    removed !== undefined
+                ) {
+                    delete this.outboundHandlers[discoveryKeyHex]
+                    await handlerEntry.member.close()
+                }
+            }
+        }
+    }
+
+    public async removeInboundHandlers(purpose: string): Promise<void> {
+        for (const [key, value] of Object.entries(this.inboundHandlers)) {
+            const newQueueItems = value.queue.filter(item => item.invite.purpose !== purpose);
+            value.queue = newQueueItems;
+
+            // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
+            // if there are no more handlers
+            if (value.current.item.invite.purpose === purpose) {
+                await value.current.candidate.close()
+            }
+        }
+    }
+
+    public async removeInboundInvite(inviteId: string): Promise<void> {
+        for (const [_, value] of Object.entries(this.inboundHandlers)) {
+            const newQueueItems = value.queue.filter(item => item.invite.inviteId !== inviteId);
+            value.queue = newQueueItems;
+
+            // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
+            // if there are no more handlers
+            if (value.current.item.invite.inviteId === inviteId) {
+                await value.current.candidate.close()
+            }
+        }
+    }
+
+    public async addInboundInviteHandler<InboundPayload, OutboundPayload>(
+        inboundHandlerOpts: InboundInviteHandlerOpts<
+            InboundPayload,
+            OutboundPayload
+        >
+    ): Promise<void> {
+        const discoveryKeyHex = b4a.toString(
+            inboundHandlerOpts.discoveryKey,
+            'hex'
+        )
+
+        const existingEntry = this.inboundHandlers[discoveryKeyHex]
+
+        if (!existingEntry) {
+            this.handleNextIncoming(discoveryKeyHex, inboundHandlerOpts)
+        } else {
+            // blind-pairing can only handle one 'addCandidate' for a given discovery key at a time 
+            existingEntry.queue.push(
+                inboundHandlerOpts as InboundInviteHandlerOpts<unknown, unknown>
+            )
+        }
+    }
+
+    public async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
+        outboundInviteHandlerOpts: OutboundInviteHandlerOpts<
+            InboundPayload,
+            OutboundPayload
+        >
+    ): Promise<void> {
+        const discoveryKeyHex = b4a.toString(
+            outboundInviteHandlerOpts.discoveryKey,
+            'hex'
+        )
+        const handler = this.outboundHandlers[discoveryKeyHex]
+
+        const _outboundInviteHandlerOpts =
+            outboundInviteHandlerOpts as OutboundInviteHandlerOpts<
+                unknown,
+                unknown
+            >
+
+        if (handler === undefined) {
+            const outer = this
+
+            const m = this.blindPairing.addMember({
+                discoveryKey: outboundInviteHandlerOpts.discoveryKey,
+
+                async onadd(_candidate: Candidate) {
+                    // TODO (robust): expand holepunch blind-peering typescript bindings
+                    const candidate = _candidate as unknown as any
+                    const inviteId = b4a.toString(candidate.inviteId, 'hex')
+
+                    await outer.sequentialRunner.runSequentiallyPerId(
+                        inviteId,
+                        () =>
+                            outer.handleOutboundInviteAcceptance(
+                                inviteId,
+                                _candidate,
+                                outboundInviteHandlerOpts
+                            )
+                    )
+                },
+            })
+
+            this.outboundHandlers[discoveryKeyHex] = {
+                member: m,
+                handlers: [_outboundInviteHandlerOpts],
+            }
+
+            await (m as any).flushed()
+        } else if (
+            !handler.handlers.some(
+                (x) => x.purpose === outboundInviteHandlerOpts.purpose
+            )
+        ) {
+            handler.handlers.push(_outboundInviteHandlerOpts)
+        }
+    }
+
     protected override async _open(): Promise<void> {
         await this.blindPairing.ready()
         this.timerTask = this.startCleanupTimerTask()
@@ -111,62 +248,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
         }
 
         await Promise.all(promises)
-    }
-
-    async addOutboundInviteHandler<InboundPayload, OutboundPayload>(
-        outboundInviteHandlerOpts: OutboundInviteHandlerOpts<
-            InboundPayload,
-            OutboundPayload
-        >
-    ): Promise<void> {
-        const discoveryKeyHex = b4a.toString(
-            outboundInviteHandlerOpts.discoveryKey,
-            'hex'
-        )
-        const handler = this.outboundHandlers[discoveryKeyHex]
-
-        const _outboundInviteHandlerOpts =
-            outboundInviteHandlerOpts as OutboundInviteHandlerOpts<
-                unknown,
-                unknown
-            >
-
-        if (handler === undefined) {
-            const outer = this
-
-            const m = this.blindPairing.addMember({
-                discoveryKey: outboundInviteHandlerOpts.discoveryKey,
-
-                async onadd(_candidate: Candidate) {
-                    // TODO (robust): expand holepunch blind-peering typescript bindings
-                    const candidate = _candidate as unknown as any
-                    const inviteId = b4a.toString(candidate.inviteId, 'hex')
-
-                    await outer.sequentialRunner.runSequentiallyPerId(
-                        inviteId,
-                        async () =>
-                            outer.handleOutboundInviteAcceptance(
-                                inviteId,
-                                _candidate,
-                                outboundInviteHandlerOpts
-                            )
-                    )
-                },
-            })
-
-            this.outboundHandlers[discoveryKeyHex] = {
-                member: m,
-                handlers: [_outboundInviteHandlerOpts],
-            }
-
-            await (m as any).flushed()
-        } else if (
-            !handler.handlers.some(
-                (x) => x.purpose === outboundInviteHandlerOpts.purpose
-            )
-        ) {
-            handler.handlers.push(_outboundInviteHandlerOpts)
-        }
     }
 
     private async handleOutboundInviteAcceptance<
@@ -247,60 +328,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 key: dbEntry.key,
                 additional: additional,
             })
-        }
-    }
-
-    async removeOutboundInviteHandler(
-        discoveryKey: Uint8Array,
-        purpose: string
-    ): Promise<void> {
-        const discoveryKeyHex = b4a.toString(discoveryKey, 'hex')
-
-        const handlerEntry = this.outboundHandlers[discoveryKeyHex]
-
-        if (handlerEntry === undefined) {
-            return
-        } else {
-            const purposeHandlerIndex = handlerEntry.handlers.findIndex(
-                (handler) => handler.purpose === purpose
-            )
-
-            if (purposeHandlerIndex > -1) {
-                const [removed] = handlerEntry.handlers.splice(
-                    purposeHandlerIndex,
-                    1
-                )
-
-                if (
-                    handlerEntry.handlers.length === 0 &&
-                    removed !== undefined
-                ) {
-                    delete this.outboundHandlers[discoveryKeyHex]
-                    await handlerEntry.member.close()
-                }
-            }
-        }
-    }
-
-    async addInboundInviteHandler<InboundPayload, OutboundPayload>(
-        inboundHandlerOpts: InboundInviteHandlerOpts<
-            InboundPayload,
-            OutboundPayload
-        >
-    ): Promise<void> {
-        const discoveryKeyHex = b4a.toString(
-            inboundHandlerOpts.discoveryKey,
-            'hex'
-        )
-
-        const existingEntry = this.inboundHandlers[discoveryKeyHex]
-
-        if (!existingEntry) {
-            this.handleNextIncoming(discoveryKeyHex, inboundHandlerOpts)
-        } else {
-            existingEntry.queue.push(
-                inboundHandlerOpts as InboundInviteHandlerOpts<unknown, unknown>
-            )
         }
     }
 

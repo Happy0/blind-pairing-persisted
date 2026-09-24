@@ -12,7 +12,6 @@ import b4a from 'b4a'
 import type { MultiplexedBlindPeering } from './multiplexed-blind-peering.js'
 import { SequentialRunner } from './sequential-runner.js'
 import { EventEmitter } from 'tseep'
-import { Result } from 'typescript-result'
 
 export type Invite = {
     invite: Uint8Array
@@ -47,8 +46,6 @@ export class InviteManager<
         OutboundAdditionalData
     >
     private multiplexedBlindPeering: MultiplexedBlindPeering
-
-    private inboundInvites: Record<string, ReadyResource> = {}
 
     private inboundInviteCodec: Codec<InboundAdditionalData>
     private outboundInviteCodec: Codec<OutboundAdditionalData>
@@ -112,11 +109,6 @@ export class InviteManager<
     protected override async _close(): Promise<void> {
         this.events.removeAllListeners()
 
-        const incoming = Object.values(this.inboundInvites).map((invite) =>
-            invite.close()
-        )
-        await Promise.all(incoming)
-
         const outboundDiscoveryKeys =
             await this.inviteDatabase.getActiveDiscoveryKeys()
 
@@ -126,6 +118,8 @@ export class InviteManager<
                 this.purpose
             )
         }
+
+        this.multiplexedBlindPeering.removeInboundHandlers(this.purpose)
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
@@ -136,13 +130,10 @@ export class InviteManager<
         }
 
         if (invite.direction === 'inbound') {
-            const inbound = this.inboundInvites[inviteId]
-
-            await this.inviteDatabase.deleteInvite(inviteId)
-
-            if (inbound) {
-                await inbound.close()
-            }
+            await this.sequentialRunner.runSequentiallyPerId(inviteId, async () => {
+                await this.inviteDatabase.deleteInvite(inviteId)
+                await this.multiplexedBlindPeering.removeInboundInvite(inviteId)
+            })
         } else {
             const discoveryKeyHex = b4a.toString(invite.discoveryKey, 'hex')
 
@@ -227,6 +218,8 @@ export class InviteManager<
         // TODO (robust): add decode invite function to holepunch types
         const decodedInvite = (BlindPairing as any).decodeInvite(invite.invite)
 
+        const inviteId = b4a.toString(decodedInvite.id, 'hex');
+
         const inboundInvite: InternalInboundInvite<InboundAdditionalData> = {
             createdAtMillisSinceEpoch: Date.now(),
             direction: 'inbound',
@@ -238,8 +231,10 @@ export class InviteManager<
             payload: payload,
         }
 
-        await this.inviteDatabase.upsertInbound(inboundInvite)
-        await this.acceptInvite(inboundInvite, decodedInvite.discoveryKey)
+        await this.sequentialRunner.runSequentiallyPerId(inviteId, async () => {
+            await this.inviteDatabase.upsertInbound(inboundInvite)
+            await this.acceptInvite(inboundInvite, decodedInvite.discoveryKey)
+        })
     }
 
     private async acceptInvite(
