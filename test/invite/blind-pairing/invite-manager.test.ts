@@ -1,6 +1,7 @@
 import { expect, test, describe } from 'vitest'
 import {
     createTestDependencies as createFreshTestDependencies,
+    createInviteManagers as createTestInviteManagers,
     getTestnetHyperswarm as getTestnetBootstrap,
 } from '../../utils.js'
 import { string } from 'compact-encoding/index.js'
@@ -55,24 +56,13 @@ describe('Invite Manager - end to end', () => {
             async () => {
                 const dhtBootstrap = await getTestnetBootstrap()
 
-                const inviter = await createFreshTestDependencies(
+                const { inviter, invitee } = await createTestInviteManagers(
                     dhtBootstrap,
                     testCorestore,
                     'test',
                     string,
                     string
                 )
-
-                const invitee = await createFreshTestDependencies(
-                    dhtBootstrap,
-                    testCorestore,
-                    'test',
-                    string,
-                    string
-                )
-
-                await inviter.inviteManager.ready()
-                await invitee.inviteManager.ready()
 
                 const inviterCorestore = await testCorestore
                     .namespace(randomBytes(10).toString('hex'))
@@ -80,14 +70,7 @@ describe('Invite Manager - end to end', () => {
                         name: 'inviter_corestore',
                     })
 
-                const inviteeCorestore = await testCorestore
-                    .namespace(randomBytes(10).toString('hex'))
-                    .get({
-                        name: 'invitee_corestore',
-                    })
-
                 await inviterCorestore.ready()
-                await inviteeCorestore.ready()
 
                 const invite = await inviter.inviteManager.createInvite(
                     inviterCorestore.key,
@@ -146,11 +129,74 @@ describe('Invite Manager - end to end', () => {
     })
 
     describe('Inbound invites', () => {
-        test('Invite can be redeemed', () => {})
+        test('Invite can be redeemed', async () => {
+            const dhtBootstrap = await getTestnetBootstrap()
+
+                const { inviter, invitee } = await createTestInviteManagers(
+                    dhtBootstrap,
+                    testCorestore,
+                    'test',
+                    string,
+                    string
+                )
+
+                const inviterCorestore = await testCorestore
+                    .namespace(randomBytes(10).toString('hex'))
+                    .get({
+                        name: 'inviter_corestore',
+                    })
+
+                await inviterCorestore.ready()
+
+                const invite = await inviter.inviteManager.createInvite(
+                    inviterCorestore.key,
+                    1,
+                    null,
+                    'testAdditionalData'
+                )
+                const dbEntry = await inviter.db.getInvite(invite.inviteId)
+
+                expect(dbEntry).toBeDefined()
+
+                const result = new Promise<{
+                    invite: InternalInboundInvite<string>,
+                    key: Uint8Array,
+                    payload: string
+                }>((resolve, reject) => {
+                    invitee.inviteManager.events.once(
+                        'inviteConfirmed',
+                        (invite, key, payload) => {
+                            resolve({ invite, key, payload })
+                        }
+                    )
+                })
+
+                await invitee.inviteManager.useInvite(
+                    { invite: invite.invite, purpose: invite.purpose },
+                    'invitee_payload'
+                )
+
+                const received = await result
+
+                expect(received.key).toStrictEqual(inviterCorestore.key)
+                expect(received.payload).toStrictEqual('testAdditionalData')
+
+                const newInviteState = await invitee.db.getInvite(
+                    invite.inviteId
+                )
+
+                if (expectInboundInvite(newInviteState)) {
+                    expect(newInviteState.status).toStrictEqual('complete')
+                }
+        })
 
         test('Invite rejection triggers event', () => {})
 
         test('Multiple invites with the same discovery key results in an error', () => {})
+    })
+
+    describe("Lifecycle management", () => {
+
     })
 
     function expectOutboundInvite<I, O>(
@@ -159,6 +205,18 @@ describe('Invite Manager - end to end', () => {
         if (invite === null) {
             fail('Invite is unexpectedly null')
         } else if (invite.direction === 'outbound') {
+            return true
+        } else {
+            fail('Not outbound invite as expected')
+        }
+    }
+
+    function expectInboundInvite<I, O>(
+        invite: InternalInboundInvite<I> | InternalOutboundInvite<O> | null
+    ): invite is InternalInboundInvite<I> {
+        if (invite === null) {
+            fail('Invite is unexpectedly null')
+        } else if (invite.direction === 'inbound') {
             return true
         } else {
             fail('Not outbound invite as expected')

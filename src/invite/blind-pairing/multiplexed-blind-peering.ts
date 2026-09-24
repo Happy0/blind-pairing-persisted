@@ -8,7 +8,6 @@ import b4a from 'b4a'
 import { decode, encode, type Codec } from 'compact-encoding'
 import { SequentialRunner } from './sequential-runner.js'
 import { EventEmitter } from 'tseep'
-import { Result } from 'typescript-result'
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {
     invite: InternalInboundInvite<InboundPayload>
@@ -60,64 +59,6 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
         this.sequentialRunner = new SequentialRunner()
         this.blindPairing = new BlindPairing(hyperswarm)
-    }
-
-       public async removeOutboundInviteHandler(
-        discoveryKey: Uint8Array,
-        purpose: string
-    ): Promise<void> {
-        const discoveryKeyHex = b4a.toString(discoveryKey, 'hex')
-
-        const handlerEntry = this.outboundHandlers[discoveryKeyHex]
-
-        if (handlerEntry === undefined) {
-            return
-        } else {
-            const purposeHandlerIndex = handlerEntry.handlers.findIndex(
-                (handler) => handler.purpose === purpose
-            )
-
-            if (purposeHandlerIndex > -1) {
-                const [removed] = handlerEntry.handlers.splice(
-                    purposeHandlerIndex,
-                    1
-                )
-
-                if (
-                    handlerEntry.handlers.length === 0 &&
-                    removed !== undefined
-                ) {
-                    delete this.outboundHandlers[discoveryKeyHex]
-                    await handlerEntry.member.close()
-                }
-            }
-        }
-    }
-
-    public async removeInboundHandlers(purpose: string): Promise<void> {
-        for (const [key, value] of Object.entries(this.inboundHandlers)) {
-            const newQueueItems = value.queue.filter(item => item.invite.purpose !== purpose);
-            value.queue = newQueueItems;
-
-            // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
-            // if there are no more handlers
-            if (value.current.item.invite.purpose === purpose) {
-                await value.current.candidate.close()
-            }
-        }
-    }
-
-    public async removeInboundInvite(inviteId: string): Promise<void> {
-        for (const [_, value] of Object.entries(this.inboundHandlers)) {
-            const newQueueItems = value.queue.filter(item => item.invite.inviteId !== inviteId);
-            value.queue = newQueueItems;
-
-            // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
-            // if there are no more handlers
-            if (value.current.item.invite.inviteId === inviteId) {
-                await value.current.candidate.close()
-            }
-        }
     }
 
     public async addInboundInviteHandler<InboundPayload, OutboundPayload>(
@@ -196,6 +137,65 @@ export class MultiplexedBlindPeering extends ReadyResource {
             )
         ) {
             handler.handlers.push(_outboundInviteHandlerOpts)
+        }
+    }
+
+
+    public async removeInboundHandlers(purpose: string): Promise<void> {
+        for (const [key, value] of Object.entries(this.inboundHandlers)) {
+            const newQueueItems = value.queue.filter(item => item.invite.purpose !== purpose);
+            value.queue = newQueueItems;
+
+            // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
+            // if there are no more handlers
+            if (value.current.item.invite.purpose === purpose) {
+                await value.current.candidate.close()
+            }
+        }
+    }
+
+    public async removeInboundInvite(inviteId: string): Promise<void> {
+        for (const [_, value] of Object.entries(this.inboundHandlers)) {
+            const newQueueItems = value.queue.filter(item => item.invite.inviteId !== inviteId);
+            value.queue = newQueueItems;
+
+            // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
+            // if there are no more handlers
+            if (value.current.item.invite.inviteId === inviteId) {
+                await value.current.candidate.close()
+            }
+        }
+    }
+
+        public async removeOutboundInviteHandler(
+        discoveryKey: Uint8Array,
+        purpose: string
+    ): Promise<void> {
+        const discoveryKeyHex = b4a.toString(discoveryKey, 'hex')
+
+        const handlerEntry = this.outboundHandlers[discoveryKeyHex]
+
+        if (handlerEntry === undefined) {
+            return
+        } else {
+            const purposeHandlerIndex = handlerEntry.handlers.findIndex(
+                (handler) => handler.purpose === purpose
+            )
+
+            if (purposeHandlerIndex > -1) {
+                const [removed] = handlerEntry.handlers.splice(
+                    purposeHandlerIndex,
+                    1
+                )
+
+                if (
+                    handlerEntry.handlers.length === 0 &&
+                    removed !== undefined
+                ) {
+                    delete this.outboundHandlers[discoveryKeyHex]
+                    await handlerEntry.member.close()
+                }
+            }
         }
     }
 

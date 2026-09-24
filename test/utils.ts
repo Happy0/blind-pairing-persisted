@@ -62,3 +62,22 @@ export async function createTestDependencies<Inbound, Outbound extends {}>(
 
     return { inviteManager, db, mbp }
 }
+
+export async function createInviteManagers<Inbound, Outbound extends {}>(
+    bootstrap: Array<BootstrapNode>,
+    corestore: Corestore,
+    purpose: string,
+    inboundCodec: Codec<Inbound>,
+    outboundCodec: Codec<Outbound>
+) {
+    const inbound = await createTestDependencies(bootstrap, corestore, purpose, inboundCodec, outboundCodec)
+    const outbound = await createTestDependencies(bootstrap, corestore, purpose, inboundCodec, outboundCodec)
+
+    await inbound.inviteManager.ready();
+    await outbound.inviteManager.ready();
+
+    return {
+        inviter: inbound,
+        invitee: outbound
+    }    
+}

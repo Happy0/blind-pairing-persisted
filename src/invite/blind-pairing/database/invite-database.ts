@@ -288,7 +288,7 @@ export class BTreeInviteDatabase<
         await this.privateHyperbee.put(inviteKey, encodedRecord)
         await this.privateHyperbee.put(
             getKeyMappingKey(invite.inviteId),
-            inviteKey
+            encode(string, inviteKey)
         )
     }
 
