@@ -1,11 +1,12 @@
 {
     "name": "blind-oairing-persisted-invites",
-    "version": "1.0.0",
+    "version": "0.0.1-beta",
     "description": "",
     "license": "MIT",
-    "author": "",
+    "author": "happy0",
     "type": "module",
-    "main": "index.js",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "scripts": {
         "test": "vitest",
         "prettier": "prettier . --write"
