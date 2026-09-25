@@ -165,13 +165,10 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         payload: OutboundAdditionalData,
         additionalNodes?: Array<AddressInput>
     ): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
-        // TODO: add expires
         const additionalData = encode(this.outboundInviteCodec, payload)
 
-        let opts: any = { data: additionalData }
-        opts = additionalNodes
-            ? { ...opts, additionalNodes: additionalNodes }
-            : opts
+        const opts: any= { data: additionalData, additionalNodes: additionalNodes}
+        if (expiresMillisSinceEpoch) opts.expires = expiresMillisSinceEpoch
 
         const invite = BlindPairing.createInvite(key, opts)
         const inviteId = b4a.toString(invite.id, 'hex')
