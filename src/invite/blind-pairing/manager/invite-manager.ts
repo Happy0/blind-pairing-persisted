@@ -9,7 +9,7 @@ import BlindPairing from 'blind-pairing'
 import { type AddressInput } from 'compact-encoding/index.js'
 import { encode, type Codec } from 'compact-encoding'
 import b4a from 'b4a'
-import type { MultiplexedBlindPeering } from './multiplexed-blind-pairing.js'
+import type { SharedBlindPairing } from './multiplexed-blind-pairing.js'
 import { SequentialRunner } from '../utils/sequential-runner.js'
 import { EventEmitter } from 'tseep'
 
@@ -42,7 +42,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         InboundAdditionalData,
         OutboundAdditionalData
     >
-    private multiplexedBlindPeering: MultiplexedBlindPeering
+    private multiplexedBlindPeering: SharedBlindPairing
 
     private inboundInviteCodec: Codec<InboundAdditionalData>
     private outboundInviteCodec: Codec<OutboundAdditionalData>
@@ -56,7 +56,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     >()
 
     constructor(
-        multiplexedBlindPeering: MultiplexedBlindPeering,
+        multiplexedBlindPeering: SharedBlindPairing,
         purpose: string,
         inviteDatabase: IInviteDatabase<
             InboundAdditionalData,

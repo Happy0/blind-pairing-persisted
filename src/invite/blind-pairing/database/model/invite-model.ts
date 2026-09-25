@@ -46,7 +46,6 @@ export type InternalInboundInvite<Payload> = {
 const HAS_EXPIRES = 1
 const HAS_COUNT = 2
 const HAS_REMAINING = 4
-const ADDITIONAL_IS_DEFINED = 8
 
 const STATUSES = ['pending', 'complete', 'failed'] as const
 

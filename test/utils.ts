@@ -1,6 +1,6 @@
 import Hyperswarm, { type BootstrapNode } from 'hyperswarm'
 import { InviteManager } from '../src/invite/blind-pairing/manager/invite-manager.js'
-import { MultiplexedBlindPeering } from '../src/invite/blind-pairing/manager/multiplexed-blind-pairing.js'
+import { SharedBlindPairing } from '../src/invite/blind-pairing/manager/multiplexed-blind-pairing.js'
 import type { Codec } from 'compact-encoding'
 import {
     BTreeInviteDatabase,
@@ -27,9 +27,9 @@ export async function createTestDependencies<Inbound, Outbound>(
 ): Promise<{
     inviteManager: InviteManager<Inbound, Outbound>
     db: IInviteDatabase<Inbound, Outbound>
-    mbp: MultiplexedBlindPeering
+    mbp: SharedBlindPairing
 }> {
-    const mbp = new MultiplexedBlindPeering(
+    const mbp = new SharedBlindPairing(
         new Hyperswarm({ bootstrap: bootstrap })
     )
 

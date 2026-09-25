@@ -1,5 +1,6 @@
 import BlindPairing from 'blind-pairing'
 
-function testaroonie() {
-    const x = new BlindPairing(null)
-}
+export * from './invite/blind-pairing/manager/invite-manager.js'
+export * from './invite/blind-pairing/database/invite-database.js' 
+export * from './invite/blind-pairing/manager/multiplexed-blind-pairing.js'
+export * from './invite/blind-pairing/database/model/invite-model.js'

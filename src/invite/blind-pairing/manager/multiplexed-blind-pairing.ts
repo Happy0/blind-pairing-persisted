@@ -45,7 +45,7 @@ type InboundHandlerEntry = {
     }
 }
 
-export class MultiplexedBlindPeering extends ReadyResource {
+export class SharedBlindPairing extends ReadyResource {
     private sequentialRunner: SequentialRunner
     private blindPairing: BlindPairing
 
