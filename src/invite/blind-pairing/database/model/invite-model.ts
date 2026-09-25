@@ -219,7 +219,10 @@ export function createOutboundInviteCodec<Payload>(
                 remaining: flags & HAS_REMAINING ? uint.decode(state) : null,
                 expiresMillisSinceEpoch:
                     flags & HAS_EXPIRES ? uint.decode(state) : null,
-                additionalData: decodeOutboundAdditionalData(state, payloadCodec)
+                additionalData: decodeOutboundAdditionalData(
+                    state,
+                    payloadCodec
+                ),
             }
         },
         encode: (
@@ -237,7 +240,8 @@ export function createOutboundInviteCodec<Payload>(
             fixed32.encode(state, value.key)
             if (value.count !== null) uint.encode(state, value.count)
             if (value.remaining !== null) uint.encode(state, value.remaining)
-            if (value.expiresMillisSinceEpoch !== null) uint.encode(state, value.expiresMillisSinceEpoch)
+            if (value.expiresMillisSinceEpoch !== null)
+                uint.encode(state, value.expiresMillisSinceEpoch)
             payloadCodec.encode(state, value.additionalData.data)
             if (value.additionalData.signature)
                 fixed64.encode(state, value.additionalData.signature)
@@ -257,7 +261,8 @@ export function createOutboundInviteCodec<Payload>(
             fixed32.preencode(state, value.key)
             if (value.count !== null) uint.preencode(state, value.count)
             if (value.remaining !== null) uint.preencode(state, value.remaining)
-            if (value.expiresMillisSinceEpoch !== null) uint.preencode(state, value.expiresMillisSinceEpoch)
+            if (value.expiresMillisSinceEpoch !== null)
+                uint.preencode(state, value.expiresMillisSinceEpoch)
             payloadCodec.preencode(state, value.additionalData.data)
             if (value.additionalData.signature)
                 fixed64.preencode(state, value.additionalData.signature)
@@ -265,22 +270,25 @@ export function createOutboundInviteCodec<Payload>(
     }
 }
 
-function decodeOutboundAdditionalData<Payload>(state: State, additionalDataCodec: Codec<Payload>): OutboundAdditionalData<Payload> {
+function decodeOutboundAdditionalData<Payload>(
+    state: State,
+    additionalDataCodec: Codec<Payload>
+): OutboundAdditionalData<Payload> {
     const payload = additionalDataCodec.decode(state)
 
     if (!payload) {
         return {
             data: payload,
-            signature: null
+            signature: null,
         }
     } else {
-        const signature = fixed64.decode(state);
+        const signature = fixed64.decode(state)
         return {
             data: payload,
-            signature: signature
+            signature: signature,
         }
     }
-} 
+}
 
 function inboundFlags(value: InternalInboundInvite<unknown>): number {
     return value.expiresMillisSinceEpoch !== null ? HAS_EXPIRES : 0

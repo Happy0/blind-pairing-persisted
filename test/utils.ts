@@ -18,7 +18,7 @@ export async function getTestnetHyperswarm(): Promise<Array<BootstrapNode>> {
     return [...bootstrap]
 }
 
-export async function createTestDependencies<Inbound, Outbound extends {}>(
+export async function createTestDependencies<Inbound, Outbound>(
     bootstrap: Array<BootstrapNode>,
     corestore: Corestore,
     purpose: string,
@@ -63,21 +63,33 @@ export async function createTestDependencies<Inbound, Outbound extends {}>(
     return { inviteManager, db, mbp }
 }
 
-export async function createInviteManagers<Inbound, Outbound extends {}>(
+export async function createInviteManagers<Inbound, Outbound>(
     bootstrap: Array<BootstrapNode>,
     corestore: Corestore,
     purpose: string,
     inboundCodec: Codec<Inbound>,
     outboundCodec: Codec<Outbound>
 ) {
-    const inbound = await createTestDependencies(bootstrap, corestore, purpose, inboundCodec, outboundCodec)
-    const outbound = await createTestDependencies(bootstrap, corestore, purpose, inboundCodec, outboundCodec)
+    const inbound = await createTestDependencies(
+        bootstrap,
+        corestore,
+        purpose,
+        inboundCodec,
+        outboundCodec
+    )
+    const outbound = await createTestDependencies(
+        bootstrap,
+        corestore,
+        purpose,
+        inboundCodec,
+        outboundCodec
+    )
 
-    await inbound.inviteManager.ready();
-    await outbound.inviteManager.ready();
+    await inbound.inviteManager.ready()
+    await outbound.inviteManager.ready()
 
     return {
         inviter: inbound,
-        invitee: outbound
-    }    
+        invitee: outbound,
+    }
 }

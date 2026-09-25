@@ -33,10 +33,7 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
     events: EventEmitter<InviteUpdateEvent<InboundPayload, OutboundPayload>>
 }
 
-export class InviteManager<
-    InboundAdditionalData,
-    OutboundAdditionalData extends {},
->
+export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     extends ReadyResource
     implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>
 {
@@ -130,10 +127,15 @@ export class InviteManager<
         }
 
         if (invite.direction === 'inbound') {
-            await this.sequentialRunner.runSequentiallyPerId(inviteId, async () => {
-                await this.inviteDatabase.deleteInvite(inviteId)
-                await this.multiplexedBlindPeering.removeInboundInvite(inviteId)
-            })
+            await this.sequentialRunner.runSequentiallyPerId(
+                inviteId,
+                async () => {
+                    await this.inviteDatabase.deleteInvite(inviteId)
+                    await this.multiplexedBlindPeering.removeInboundInvite(
+                        inviteId
+                    )
+                }
+            )
         } else {
             const discoveryKeyHex = b4a.toString(invite.discoveryKey, 'hex')
 
@@ -184,11 +186,17 @@ export class InviteManager<
             direction: 'outbound',
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
-            additionalData: (payload !== null && payload !== undefined) ? {
-                data: payload,
-                // The signature should never be undefined if 'payload' is not null or undefined
-                signature: additionalDataSignature!,
-            } : payload,
+            additionalData:
+                payload !== null && payload !== undefined
+                    ? {
+                          data: payload,
+                          // The signature should never be undefined if 'payload' is not null or undefined
+                          signature: additionalDataSignature!,
+                      }
+                    : {
+                          data: payload,
+                          signature: null,
+                      },
             invite: invite.invite,
             inviteId: inviteId,
             key: key,
@@ -218,7 +226,7 @@ export class InviteManager<
         // TODO (robust): add decode invite function to holepunch types
         const decodedInvite = (BlindPairing as any).decodeInvite(invite.invite)
 
-        const inviteId = b4a.toString(decodedInvite.id, 'hex');
+        const inviteId = b4a.toString(decodedInvite.id, 'hex')
 
         const inboundInvite: InternalInboundInvite<InboundAdditionalData> = {
             createdAtMillisSinceEpoch: Date.now(),

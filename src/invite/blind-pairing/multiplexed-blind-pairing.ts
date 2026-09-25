@@ -77,7 +77,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         if (!existingEntry) {
             this.handleNextIncoming(discoveryKeyHex, inboundHandlerOpts)
         } else {
-            // blind-pairing can only handle one 'addCandidate' for a given discovery key at a time 
+            // blind-pairing can only handle one 'addCandidate' for a given discovery key at a time
             existingEntry.queue.push(
                 inboundHandlerOpts as InboundInviteHandlerOpts<unknown, unknown>
             )
@@ -140,11 +140,12 @@ export class MultiplexedBlindPeering extends ReadyResource {
         }
     }
 
-
     public async removeInboundHandlers(purpose: string): Promise<void> {
         for (const [key, value] of Object.entries(this.inboundHandlers)) {
-            const newQueueItems = value.queue.filter(item => item.invite.purpose !== purpose);
-            value.queue = newQueueItems;
+            const newQueueItems = value.queue.filter(
+                (item) => item.invite.purpose !== purpose
+            )
+            value.queue = newQueueItems
 
             // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
             // if there are no more handlers
@@ -156,8 +157,10 @@ export class MultiplexedBlindPeering extends ReadyResource {
 
     public async removeInboundInvite(inviteId: string): Promise<void> {
         for (const [_, value] of Object.entries(this.inboundHandlers)) {
-            const newQueueItems = value.queue.filter(item => item.invite.inviteId !== inviteId);
-            value.queue = newQueueItems;
+            const newQueueItems = value.queue.filter(
+                (item) => item.invite.inviteId !== inviteId
+            )
+            value.queue = newQueueItems
 
             // TODO (test): verify that this causes the promise in handleNextIncoming to end and remove the item from the map
             // if there are no more handlers
@@ -167,7 +170,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         }
     }
 
-        public async removeOutboundInviteHandler(
+    public async removeOutboundInviteHandler(
         discoveryKey: Uint8Array,
         purpose: string
     ): Promise<void> {
@@ -283,7 +286,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
                 inviteId,
                 sessionId
             )
-        const additional = dbEntry.additionalData
+        const additional = dbEntry.additionalData.data
             ? {
                   data: encode(
                       outboundInviteHandlerOpts.outboundCodec,
@@ -325,7 +328,7 @@ export class MultiplexedBlindPeering extends ReadyResource {
         } else if (existingRedemption) {
             candidate.confirm({
                 key: dbEntry.key,
-                additional: additional,
+                additional: additional || undefined,
             })
         }
     }

@@ -4,7 +4,7 @@ import {
     createInviteManagers as createTestInviteManagers,
     getTestnetHyperswarm as getTestnetBootstrap,
 } from '../../utils.js'
-import { fixed32, fixed8, string } from 'compact-encoding/index.js'
+import { fixed32, string } from 'compact-encoding/index.js'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import Corestore from 'corestore'
@@ -14,6 +14,7 @@ import type {
 } from '../../../src/invite/blind-pairing/database/model/invite-model.js'
 import { randomBytes } from 'node:crypto'
 import { fail } from 'node:assert'
+import { nullCodec, undefinedCodec } from '../../../src/invite/blind-pairing/database/model/codecs.js'
 
 describe('Invite Manager - end to end', () => {
     const testDataDir = tmpdir() + path.sep + 'blind-pairing-tests'
@@ -113,17 +114,123 @@ describe('Invite Manager - end to end', () => {
             }
         )
 
-        test("Null additional data works as expected", () => {
+        test('Null additional data works as expected', async () => {
+            const dhtBootstrap = await getTestnetBootstrap()
 
+            const { inviter, invitee } = await createTestInviteManagers(
+                dhtBootstrap,
+                testCorestore,
+                'test',
+                string,
+                nullCodec
+            )
+
+            const inviterCorestore = await testCorestore
+                .namespace(randomBytes(10).toString('hex'))
+                .get({
+                    name: 'inviter_corestore',
+                })
+
+            await inviterCorestore.ready()
+
+            const invite = await inviter.inviteManager.createInvite(
+                inviterCorestore.key,
+                1,
+                null,
+                null
+            )
+            const dbEntry = await inviter.db.getInvite(invite.inviteId)
+
+            expect(dbEntry).toBeDefined()
+
+            const result = new Promise<{
+                invite: InternalOutboundInvite<null>
+                payload: string
+            }>((resolve, reject) => {
+                inviter.inviteManager.events.once(
+                    'inviteAccepted',
+                    (invite, payload) => {
+                        resolve({ invite, payload })
+                    }
+                )
+            })
+
+            await invitee.inviteManager.useInvite(
+                { invite: invite.invite, purpose: invite.purpose },
+                'invitee_payload'
+            )
+
+            const received = await result
+
+            expect(received.payload).toStrictEqual('invitee_payload')
+
+            const newInviteState = await inviter.db.getInvite(invite.inviteId)
+
+            if (expectOutboundInvite(newInviteState)) {
+                expect(newInviteState.remaining).toStrictEqual(0)
+                expect(newInviteState.additionalData.data).toStrictEqual(null)
+            }
         })
 
-        test("Undefined additional data works as expected", () => {
-            
+        test('Undefined additional data works as expected', async () => {
+            const dhtBootstrap = await getTestnetBootstrap()
+
+            const { inviter, invitee } = await createTestInviteManagers(
+                dhtBootstrap,
+                testCorestore,
+                'test',
+                string,
+                undefinedCodec
+            )
+
+            const inviterCorestore = await testCorestore
+                .namespace(randomBytes(10).toString('hex'))
+                .get({
+                    name: 'inviter_corestore',
+                })
+
+            await inviterCorestore.ready()
+
+            const invite = await inviter.inviteManager.createInvite(
+                inviterCorestore.key,
+                1,
+                null,
+                undefined
+            )
+            const dbEntry = await inviter.db.getInvite(invite.inviteId)
+
+            expect(dbEntry).toBeDefined()
+
+            const result = new Promise<{
+                invite: InternalOutboundInvite<undefined>
+                payload: string
+            }>((resolve, reject) => {
+                inviter.inviteManager.events.once(
+                    'inviteAccepted',
+                    (invite, payload) => {
+                        resolve({ invite, payload })
+                    }
+                )
+            })
+
+            await invitee.inviteManager.useInvite(
+                { invite: invite.invite, purpose: invite.purpose },
+                'invitee_payload'
+            )
+
+            const received = await result
+
+            expect(received.payload).toStrictEqual('invitee_payload')
+
+            const newInviteState = await inviter.db.getInvite(invite.inviteId)
+
+            if (expectOutboundInvite(newInviteState)) {
+                expect(newInviteState.remaining).toStrictEqual(0)
+                expect(newInviteState.additionalData.data).toStrictEqual(undefined)
+            }
         })
 
-        test("Additional nodes added to invite", () => {
-            
-        })
+        test('Additional nodes added to invite', () => {})
 
         test('Outbound invite re-loaded from storage can be redeemed as expected', () => {})
 
@@ -144,87 +251,82 @@ describe('Invite Manager - end to end', () => {
         test('Invite can be redeemed', async () => {
             const dhtBootstrap = await getTestnetBootstrap()
 
-                const { inviter, invitee } = await createTestInviteManagers<Uint8Array, string>(
-                    dhtBootstrap,
-                    testCorestore,
-                    'test',
-                    fixed32,
-                    string
-                )
+            const { inviter, invitee } = await createTestInviteManagers<
+                Uint8Array,
+                string
+            >(dhtBootstrap, testCorestore, 'test', fixed32, string)
 
-                const inviterCorestore = await testCorestore
-                    .namespace(randomBytes(10).toString('hex'))
-                    .get({
-                        name: 'inviter_corestore',
-                    })
-
-                await inviterCorestore.ready()
-
-                const inviteeCorestore = await testCorestore
-                    .namespace(randomBytes(10).toString('hex'))
-                    .get({
-                        name: 'invitee_corestore',
+            const inviterCorestore = await testCorestore
+                .namespace(randomBytes(10).toString('hex'))
+                .get({
+                    name: 'inviter_corestore',
                 })
 
-                await inviteeCorestore.ready();
+            await inviterCorestore.ready()
 
-                const invite = await inviter.inviteManager.createInvite(
-                    inviterCorestore.key,
-                    1,
-                    null,
-                    "testaroonie"
-                )
-
-                const dbEntry = await inviter.db.getInvite(invite.inviteId)
-
-                expect(dbEntry).toBeDefined()
-
-                const inboundResult = new Promise<{
-                    invite: InternalInboundInvite<Uint8Array>,
-                    key: Uint8Array,
-                    payload: string
-                }>((resolve, reject) => {
-                    invitee.inviteManager.events.once(
-                        'inviteConfirmed',
-                        (invite, key, payload) => {
-                            resolve({ invite, key, payload })
-                        }
-                    )
+            const inviteeCorestore = await testCorestore
+                .namespace(randomBytes(10).toString('hex'))
+                .get({
+                    name: 'invitee_corestore',
                 })
 
-                const outboundResult = new Promise<{
-                    invite: InternalOutboundInvite<string>
-                    payload: Uint8Array
-                }>((resolve, reject) => {
-                    inviter.inviteManager.events.once(
-                        'inviteAccepted',
-                        (invite, payload) => {
-                            resolve({ invite, payload })
-                        }
-                    )
-                })
+            await inviteeCorestore.ready()
 
-                await invitee.inviteManager.useInvite(
-                    { invite: invite.invite, purpose: invite.purpose },
-                    inviteeCorestore.key
+            const invite = await inviter.inviteManager.createInvite(
+                inviterCorestore.key,
+                1,
+                null,
+                'testaroonie'
+            )
+
+            const dbEntry = await inviter.db.getInvite(invite.inviteId)
+
+            expect(dbEntry).toBeDefined()
+
+            const inboundResult = new Promise<{
+                invite: InternalInboundInvite<Uint8Array>
+                key: Uint8Array
+                payload: string
+            }>((resolve, reject) => {
+                invitee.inviteManager.events.once(
+                    'inviteConfirmed',
+                    (invite, key, payload) => {
+                        resolve({ invite, key, payload })
+                    }
                 )
+            })
 
-                const inboundReceived = await inboundResult
-
-                expect(inboundReceived.key).toStrictEqual(inviterCorestore.key)
-                expect(inboundReceived.payload).toStrictEqual('testaroonie')
-
-                const newInviteState = await invitee.db.getInvite(
-                    invite.inviteId
+            const outboundResult = new Promise<{
+                invite: InternalOutboundInvite<string>
+                payload: Uint8Array
+            }>((resolve, reject) => {
+                inviter.inviteManager.events.once(
+                    'inviteAccepted',
+                    (invite, payload) => {
+                        resolve({ invite, payload })
+                    }
                 )
+            })
 
-                if (expectInboundInvite(newInviteState)) {
-                    expect(newInviteState.status).toStrictEqual('complete')
-                }
+            await invitee.inviteManager.useInvite(
+                { invite: invite.invite, purpose: invite.purpose },
+                inviteeCorestore.key
+            )
 
-                const outboundReceived = await outboundResult;
+            const inboundReceived = await inboundResult
 
-                expect(outboundReceived.payload).toStrictEqual(inviteeCorestore.key)
+            expect(inboundReceived.key).toStrictEqual(inviterCorestore.key)
+            expect(inboundReceived.payload).toStrictEqual('testaroonie')
+
+            const newInviteState = await invitee.db.getInvite(invite.inviteId)
+
+            if (expectInboundInvite(newInviteState)) {
+                expect(newInviteState.status).toStrictEqual('complete')
+            }
+
+            const outboundReceived = await outboundResult
+
+            expect(outboundReceived.payload).toStrictEqual(inviteeCorestore.key)
         })
 
         test('Invite rejection triggers event', () => {})
@@ -232,20 +334,12 @@ describe('Invite Manager - end to end', () => {
         test('Multiple invites with the same discovery key results in an error', () => {})
     })
 
-    describe("Lifecycle management", () => {
+    describe('Lifecycle management', () => {
+        test('Deleting an outbound invite results in the blind pairing member being closed', () => {})
 
-        test("Deleting an outbound invite results in the blind pairing member being closed", () => {
+        test('Deleting an inbound invite results in the blind pairing candidate being closed', () => {})
 
-        })
-
-        test("Deleting an inbound invite results in the blind pairing candidate being closed", () => {
-
-        })
-
-        test("Expired inbound invites are not added to blind pairing at invite manager load", () => {
-            
-        })
-
+        test('Expired inbound invites are not added to blind pairing at invite manager load', () => {})
     })
 
     function expectOutboundInvite<I, O>(

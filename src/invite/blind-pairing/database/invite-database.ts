@@ -64,7 +64,7 @@ export interface IInviteDatabase<
 
 export class BTreeInviteDatabase<
     InboundPayload,
-    OutboundPayload extends {},
+    OutboundPayload,
 > implements IInviteDatabase<InboundPayload, OutboundPayload> {
     private inboundInviteCodec: Codec<InternalInboundInvite<InboundPayload>>
     private outboundInviteCodec: Codec<InternalOutboundInvite<OutboundPayload>>
