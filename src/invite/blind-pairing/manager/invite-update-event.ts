@@ -1,7 +1,7 @@
 import type {
     InternalInboundInvite,
     InternalOutboundInvite,
-} from './database/model/invite-model.js'
+} from '../database/model/invite-model.js'
 
 export type InviteUpdateEvent<InboundPayload, OutboundPayload> = {
     /**

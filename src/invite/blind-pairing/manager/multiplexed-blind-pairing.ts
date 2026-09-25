@@ -1,12 +1,12 @@
 import BlindPairing, { type Candidate, type Member } from 'blind-pairing'
 import type Hyperswarm from 'hyperswarm'
 import type { InviteUpdateEvent } from './invite-update-event.js'
-import type { IInviteDatabase } from './database/invite-database.js'
+import type { IInviteDatabase } from '../database/invite-database.js'
 import ReadyResource from 'ready-resource'
-import type { InternalInboundInvite } from './database/model/invite-model.js'
+import type { InternalInboundInvite } from '../database/model/invite-model.js'
 import b4a from 'b4a'
 import { decode, encode, type Codec } from 'compact-encoding'
-import { SequentialRunner } from './sequential-runner.js'
+import { SequentialRunner } from '../utils/sequential-runner.js'
 import { EventEmitter } from 'tseep'
 
 export type InboundInviteHandlerOpts<InboundPayload, OutboundPayload> = {

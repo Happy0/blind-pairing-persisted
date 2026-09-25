@@ -1,16 +1,16 @@
 import ReadyResource from 'ready-resource'
-import type { IInviteDatabase } from './database/invite-database.js'
+import type { IInviteDatabase } from '../database/invite-database.js'
 import type { InviteUpdateEvent } from './invite-update-event.js'
 import {
     type InternalOutboundInvite,
     type InternalInboundInvite,
-} from './database/model/invite-model.js'
+} from '../database/model/invite-model.js'
 import BlindPairing from 'blind-pairing'
 import { type AddressInput } from 'compact-encoding/index.js'
 import { encode, type Codec } from 'compact-encoding'
 import b4a from 'b4a'
 import type { MultiplexedBlindPeering } from './multiplexed-blind-pairing.js'
-import { SequentialRunner } from './sequential-runner.js'
+import { SequentialRunner } from '../utils/sequential-runner.js'
 import { EventEmitter } from 'tseep'
 
 export type Invite = {
