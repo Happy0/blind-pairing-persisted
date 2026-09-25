@@ -23,12 +23,6 @@ export interface IReadOnlyInviteDatabase<
         | null
     >
 
-    addInviteAcceptance(
-        invite: InternalOutboundInvite<OutboundAdditionalData>,
-        sessionId: string
-    ): Promise<void>
-    isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>
-
     getAllActiveInbound(): AsyncIterable<
         InternalInboundInvite<InboundAdditionalData>
     >
@@ -59,6 +53,14 @@ export interface IInviteDatabase<
     upsertInbound(
         invite: InternalInboundInvite<InboundAdditionalData>
     ): Promise<void>
+
+    addInviteAcceptance(
+        invite: InternalOutboundInvite<OutboundAdditionalData>,
+        sessionId: string
+    ): Promise<void>
+
+    isAlreadyUsed(outboundInviteId: string, sessionId: string): Promise<boolean>
+
     deleteInvite(inviteId: string): Promise<void>
 }
 
@@ -77,7 +79,7 @@ export class BTreeInviteDatabase<
     private privateHyperbee: Hyperbee
 
     /**
-     * @param privateHyperbee A hyperbee database (not replicated) to store the invite.
+     * @param privateHyperbee A hyperbee database to store the invite. This should not be replicated.
      * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
      * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
      */

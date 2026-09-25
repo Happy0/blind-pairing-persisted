@@ -23,7 +23,7 @@ describe('Invite Manager - end to end', () => {
     describe('Outbound invites', () => {
         test('Invites can be created and stored', async () => {
             const dhtBootstrap = await getTestnetBootstrap()
-            const { inviteManager, db } = await createFreshTestDependencies(
+            const { inviteManager } = await createFreshTestDependencies(
                 dhtBootstrap,
                 testCorestore,
                 'test',
@@ -46,7 +46,7 @@ describe('Invite Manager - end to end', () => {
                 'testAdditionalData'
             )
 
-            const dbEntry = await db.getInvite(invite.inviteId)
+            const dbEntry = await inviteManager.data().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
         })
@@ -79,7 +79,7 @@ describe('Invite Manager - end to end', () => {
                     null,
                     'testAdditionalData'
                 )
-                const dbEntry = await inviter.db.getInvite(invite.inviteId)
+                const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
 
                 expect(dbEntry).toBeDefined()
 
@@ -104,7 +104,7 @@ describe('Invite Manager - end to end', () => {
 
                 expect(received.payload).toStrictEqual('invitee_payload')
 
-                const newInviteState = await inviter.db.getInvite(
+                const newInviteState = await inviter.inviteManager.data().getInvite(
                     invite.inviteId
                 )
 
@@ -139,7 +139,7 @@ describe('Invite Manager - end to end', () => {
                 null,
                 null
             )
-            const dbEntry = await inviter.db.getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -164,7 +164,7 @@ describe('Invite Manager - end to end', () => {
 
             expect(received.payload).toStrictEqual('invitee_payload')
 
-            const newInviteState = await inviter.db.getInvite(invite.inviteId)
+            const newInviteState = await inviter.inviteManager.data().getInvite(invite.inviteId)
 
             if (expectOutboundInvite(newInviteState)) {
                 expect(newInviteState.remaining).toStrictEqual(0)
@@ -197,7 +197,7 @@ describe('Invite Manager - end to end', () => {
                 null,
                 undefined
             )
-            const dbEntry = await inviter.db.getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -222,7 +222,7 @@ describe('Invite Manager - end to end', () => {
 
             expect(received.payload).toStrictEqual('invitee_payload')
 
-            const newInviteState = await inviter.db.getInvite(invite.inviteId)
+            const newInviteState = await inviter.inviteManager.data().getInvite(invite.inviteId)
 
             if (expectOutboundInvite(newInviteState)) {
                 expect(newInviteState.remaining).toStrictEqual(0)
@@ -279,7 +279,7 @@ describe('Invite Manager - end to end', () => {
                 'testaroonie'
             )
 
-            const dbEntry = await inviter.db.getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -318,7 +318,7 @@ describe('Invite Manager - end to end', () => {
             expect(inboundReceived.key).toStrictEqual(inviterCorestore.key)
             expect(inboundReceived.payload).toStrictEqual('testaroonie')
 
-            const newInviteState = await invitee.db.getInvite(invite.inviteId)
+            const newInviteState = await invitee.inviteManager.data().getInvite(invite.inviteId)
 
             if (expectInboundInvite(newInviteState)) {
                 expect(newInviteState.status).toStrictEqual('complete')

@@ -26,7 +26,6 @@ export async function createTestDependencies<Inbound, Outbound>(
     outboundCodec: Codec<Outbound>
 ): Promise<{
     inviteManager: InviteManager<Inbound, Outbound>
-    db: IInviteDatabase<Inbound, Outbound>
     mbp: SharedBlindPairing
 }> {
     const mbp = new SharedBlindPairing(
@@ -45,22 +44,15 @@ export async function createTestDependencies<Inbound, Outbound>(
     })
     await hyperbee.ready()
 
-    const db = new BTreeInviteDatabase<Inbound, Outbound>(
-        hyperbee,
-        purpose,
-        inboundCodec,
-        outboundCodec
-    )
-
     const inviteManager = new InviteManager<Inbound, Outbound>(
         mbp,
         purpose,
-        db,
+        hyperbee,
         inboundCodec,
         outboundCodec
     )
 
-    return { inviteManager, db, mbp }
+    return { inviteManager, mbp }
 }
 
 export async function createInviteManagers<Inbound, Outbound>(

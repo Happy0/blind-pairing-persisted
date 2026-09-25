@@ -1,5 +1,5 @@
 import ReadyResource from 'ready-resource'
-import type { IInviteDatabase } from '../database/invite-database.js'
+import { BTreeInviteDatabase, type IInviteDatabase, type IReadOnlyInviteDatabase } from '../database/invite-database.js'
 import type { InviteUpdateEvent } from './invite-update-event.js'
 import {
     type InternalOutboundInvite,
@@ -12,6 +12,7 @@ import b4a from 'b4a'
 import type { SharedBlindPairing } from './multiplexed-blind-pairing.js'
 import { SequentialRunner } from '../utils/sequential-runner.js'
 import { EventEmitter } from 'tseep'
+import type Hyperbee from 'hyperbee'
 
 export type Invite = {
     invite: Uint8Array
@@ -42,7 +43,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         InboundAdditionalData,
         OutboundAdditionalData
     >
-    private multiplexedBlindPeering: SharedBlindPairing
+    private sharedBlindPeering: SharedBlindPairing
 
     private inboundInviteCodec: Codec<InboundAdditionalData>
     private outboundInviteCodec: Codec<OutboundAdditionalData>
@@ -56,20 +57,17 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     >()
 
     constructor(
-        multiplexedBlindPeering: SharedBlindPairing,
+        sharedBlindPeering: SharedBlindPairing,
         purpose: string,
-        inviteDatabase: IInviteDatabase<
-            InboundAdditionalData,
-            OutboundAdditionalData
-        >,
+        privateHyperbee: Hyperbee,
         inboundCodec: Codec<InboundAdditionalData>,
         outboundCodec: Codec<OutboundAdditionalData>
     ) {
         super()
         this.purpose = purpose
-        this.inviteDatabase = inviteDatabase
+        this.inviteDatabase = new BTreeInviteDatabase(privateHyperbee, purpose, inboundCodec, outboundCodec);
 
-        this.multiplexedBlindPeering = multiplexedBlindPeering
+        this.sharedBlindPeering = sharedBlindPeering
 
         this.inboundInviteCodec = inboundCodec
         this.outboundInviteCodec = outboundCodec
@@ -80,10 +78,10 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         const outboundDiscoveryKeys =
             await this.inviteDatabase.getActiveDiscoveryKeys()
 
-        await this.multiplexedBlindPeering.ready()
+        await this.sharedBlindPeering.ready()
 
         for (const key of outboundDiscoveryKeys.keys) {
-            this.multiplexedBlindPeering.addOutboundInviteHandler({
+            this.sharedBlindPeering.addOutboundInviteHandler({
                 database: this.inviteDatabase,
                 discoveryKey: key.discoveryKey,
                 expiresMillisSinceEpoch:
@@ -110,13 +108,13 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
             await this.inviteDatabase.getActiveDiscoveryKeys()
 
         for (const key of outboundDiscoveryKeys.keys) {
-            this.multiplexedBlindPeering.removeOutboundInviteHandler(
+            this.sharedBlindPeering.removeOutboundInviteHandler(
                 key.discoveryKey,
                 this.purpose
             )
         }
 
-        this.multiplexedBlindPeering.removeInboundHandlers(this.purpose)
+        this.sharedBlindPeering.removeInboundHandlers(this.purpose)
     }
 
     async deleteInvite(inviteId: string): Promise<void> {
@@ -131,7 +129,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
                 inviteId,
                 async () => {
                     await this.inviteDatabase.deleteInvite(inviteId)
-                    await this.multiplexedBlindPeering.removeInboundInvite(
+                    await this.sharedBlindPeering.removeInboundInvite(
                         inviteId
                     )
                 }
@@ -150,7 +148,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
                         )
 
                     if (!discoveryKeyInUse) {
-                        await this.multiplexedBlindPeering.removeOutboundInviteHandler(
+                        await this.sharedBlindPeering.removeOutboundInviteHandler(
                             invite.discoveryKey,
                             invite.purpose
                         )
@@ -245,11 +243,15 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         })
     }
 
+    public data(): IReadOnlyInviteDatabase<InboundAdditionalData, OutboundAdditionalData> {
+        return this.inviteDatabase;
+    }
+
     private async acceptInvite(
         inbound: InternalInboundInvite<InboundAdditionalData>,
         discoveryKey: Uint8Array
     ): Promise<void> {
-        await this.multiplexedBlindPeering.addInboundInviteHandler({
+        await this.sharedBlindPeering.addInboundInviteHandler({
             database: this.inviteDatabase,
             invite: inbound,
             eventEmitter: this.events,
@@ -262,7 +264,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     private listenForInviteAcceptance(
         invite: InternalOutboundInvite<OutboundAdditionalData>
     ): void {
-        this.multiplexedBlindPeering.addOutboundInviteHandler({
+        this.sharedBlindPeering.addOutboundInviteHandler({
             database: this.inviteDatabase,
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: invite.expiresMillisSinceEpoch,
