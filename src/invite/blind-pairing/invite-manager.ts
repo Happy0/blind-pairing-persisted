@@ -18,7 +18,7 @@ export type Invite = {
     purpose: string
 }
 
-export interface IInviteManager<InboundPayload, OutboundPayload extends {}> {
+export interface IInviteManager<InboundPayload, OutboundPayload> {
     createInvite(
         key: Uint8Array,
         count: number,
@@ -184,11 +184,11 @@ export class InviteManager<
             direction: 'outbound',
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
-            additionalData: {
+            additionalData: (payload !== null && payload !== undefined) ? {
                 data: payload,
-                // Safe to coerce since OutboundAdditionalData must be non null/undefined
+                // The signature should never be undefined if 'payload' is not null or undefined
                 signature: additionalDataSignature!,
-            },
+            } : payload,
             invite: invite.invite,
             inviteId: inviteId,
             key: key,

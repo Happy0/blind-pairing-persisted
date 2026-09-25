@@ -11,6 +11,12 @@ import {
 
 export type InviteId = string
 
+export type OutboundAdditionalData<Payload> = {
+    data: Payload
+    // Null if the type of 'payload' is undefined or null
+    signature: Uint8Array | null
+}
+
 export type InternalOutboundInvite<Payload> = {
     direction: 'outbound'
     purpose: string
@@ -23,10 +29,7 @@ export type InternalOutboundInvite<Payload> = {
     count: number | null
     remaining: number | null
     expiresMillisSinceEpoch: number | null
-    additionalData: {
-        data: Payload
-        signature: Uint8Array
-    }
+    additionalData: OutboundAdditionalData<Payload>
 }
 
 export type InternalInboundInvite<Payload> = {
@@ -43,6 +46,7 @@ export type InternalInboundInvite<Payload> = {
 const HAS_EXPIRES = 1
 const HAS_COUNT = 2
 const HAS_REMAINING = 4
+const ADDITIONAL_IS_DEFINED = 8
 
 const STATUSES = ['pending', 'complete', 'failed'] as const
 
@@ -215,10 +219,7 @@ export function createOutboundInviteCodec<Payload>(
                 remaining: flags & HAS_REMAINING ? uint.decode(state) : null,
                 expiresMillisSinceEpoch:
                     flags & HAS_EXPIRES ? uint.decode(state) : null,
-                additionalData: {
-                    data: payloadCodec.decode(state),
-                    signature: fixed64.decode(state),
-                },
+                additionalData: decodeOutboundAdditionalData(state, payloadCodec)
             }
         },
         encode: (
@@ -236,11 +237,9 @@ export function createOutboundInviteCodec<Payload>(
             fixed32.encode(state, value.key)
             if (value.count !== null) uint.encode(state, value.count)
             if (value.remaining !== null) uint.encode(state, value.remaining)
-            if (value.expiresMillisSinceEpoch !== null)
-                uint.encode(state, value.expiresMillisSinceEpoch)
-            if (value.additionalData)
-                payloadCodec.encode(state, value.additionalData.data)
-            if (value.additionalData)
+            if (value.expiresMillisSinceEpoch !== null) uint.encode(state, value.expiresMillisSinceEpoch)
+            payloadCodec.encode(state, value.additionalData.data)
+            if (value.additionalData.signature)
                 fixed64.encode(state, value.additionalData.signature)
         },
         preencode: (
@@ -258,15 +257,30 @@ export function createOutboundInviteCodec<Payload>(
             fixed32.preencode(state, value.key)
             if (value.count !== null) uint.preencode(state, value.count)
             if (value.remaining !== null) uint.preencode(state, value.remaining)
-            if (value.expiresMillisSinceEpoch !== null)
-                uint.preencode(state, value.expiresMillisSinceEpoch)
-            if (value.additionalData)
-                payloadCodec.preencode(state, value.additionalData.data)
-            if (value.additionalData)
+            if (value.expiresMillisSinceEpoch !== null) uint.preencode(state, value.expiresMillisSinceEpoch)
+            payloadCodec.preencode(state, value.additionalData.data)
+            if (value.additionalData.signature)
                 fixed64.preencode(state, value.additionalData.signature)
         },
     }
 }
+
+function decodeOutboundAdditionalData<Payload>(state: State, additionalDataCodec: Codec<Payload>): OutboundAdditionalData<Payload> {
+    const payload = additionalDataCodec.decode(state)
+
+    if (!payload) {
+        return {
+            data: payload,
+            signature: null
+        }
+    } else {
+        const signature = fixed64.decode(state);
+        return {
+            data: payload,
+            signature: signature
+        }
+    }
+} 
 
 function inboundFlags(value: InternalInboundInvite<unknown>): number {
     return value.expiresMillisSinceEpoch !== null ? HAS_EXPIRES : 0

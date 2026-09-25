@@ -113,6 +113,14 @@ describe('Invite Manager - end to end', () => {
             }
         )
 
+        test("Null additional data works as expected", () => {
+
+        })
+
+        test("Undefined additional data works as expected", () => {
+            
+        })
+
         test("Additional nodes added to invite", () => {
             
         })
