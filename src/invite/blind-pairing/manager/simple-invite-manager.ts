@@ -1,6 +1,6 @@
 import type Hyperbee from "hyperbee";
 import { InviteManager } from "./invite-manager.js";
-import type { SharedBlindPairing } from "./multiplexed-blind-pairing.js";
+import type { SharedBlindPairing } from "./shared-blind-pairing.js";
 import { nullCodec } from "../database/model/codecs.js";
 import { fixed32 } from 'compact-encoding/index.js'
 

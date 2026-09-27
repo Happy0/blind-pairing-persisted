@@ -1,15 +1,12 @@
 import Hyperswarm, { type BootstrapNode } from 'hyperswarm'
 import { InviteManager } from '../src/invite/blind-pairing/manager/invite-manager.js'
-import { SharedBlindPairing } from '../src/invite/blind-pairing/manager/multiplexed-blind-pairing.js'
+import { SharedBlindPairing } from '../src/invite/blind-pairing/manager/shared-blind-pairing.js'
 import type { Codec } from 'compact-encoding'
-import {
-    BTreeInviteDatabase,
-    type IInviteDatabase,
-} from '../src/invite/blind-pairing/database/invite-database.js'
 import Corestore from 'corestore'
 import Hyperbee from 'hyperbee'
 import { randomBytes } from 'node:crypto'
 import createTestnet from 'hyperdht/testnet.js'
+import BlindPairing from 'blind-pairing'
 
 export async function getTestnetHyperswarm(): Promise<Array<BootstrapNode>> {
     const testnet = await createTestnet(10)
@@ -29,7 +26,7 @@ export async function createTestDependencies<Inbound, Outbound>(
     mbp: SharedBlindPairing
 }> {
     const mbp = new SharedBlindPairing(
-        new Hyperswarm({ bootstrap: bootstrap })
+        new BlindPairing(new Hyperswarm({ bootstrap: bootstrap }))
     )
 
     const randomCoreName = randomBytes(20).toString('hex')

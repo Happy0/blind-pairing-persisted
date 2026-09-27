@@ -9,7 +9,7 @@ import BlindPairing from 'blind-pairing'
 import { type AddressInput } from 'compact-encoding/index.js'
 import { encode, type Codec } from 'compact-encoding'
 import b4a from 'b4a'
-import type { SharedBlindPairing } from './multiplexed-blind-pairing.js'
+import type { SharedBlindPairing } from './shared-blind-pairing.js'
 import { SequentialRunner } from '../utils/sequential-runner.js'
 import { EventEmitter } from 'tseep'
 import type Hyperbee from 'hyperbee'
@@ -34,6 +34,10 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
     events: EventEmitter<InviteUpdateEvent<InboundPayload, OutboundPayload>>
 }
 
+/**
+ * @typeParam InboundAdditionalData - the type of the data the invitee sends the inviter when they accept an invite
+ * @typeParam OutboundAdditionalData the data, additional to the key, that the inviter sends to the invitee when confirming an invite acceptance
+ */
 export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     extends ReadyResource
     implements IInviteManager<InboundAdditionalData, OutboundAdditionalData>
@@ -56,8 +60,16 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         InviteUpdateEvent<InboundAdditionalData, OutboundAdditionalData>
     >()
 
+    /**
+     * 
+     * @param sharedBlindPairing a 'shared blind pairing' instance that should be shared across different invite managers instantiated in the app
+     * @param purpose A unique string per invite manager in the app describing what the invites are used for.
+     * @param privateHyperbee a Hyperbee for storing the invites in. This should not be replicated to keep the invites private.
+     * @param inboundCodec a codec for decoding the data the invitee sends to the inviter when redeeming the invite
+     * @param outboundCodec a codec for encoding the additional data the inviter sends to the invitee when confirming their invite acceptance
+     */
     constructor(
-        sharedBlindPeering: SharedBlindPairing,
+        sharedBlindPairing: SharedBlindPairing,
         purpose: string,
         privateHyperbee: Hyperbee,
         inboundCodec: Codec<InboundAdditionalData>,
@@ -67,7 +79,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         this.purpose = purpose
         this.inviteDatabase = new BTreeInviteDatabase(privateHyperbee, purpose, inboundCodec, outboundCodec);
 
-        this.sharedBlindPeering = sharedBlindPeering
+        this.sharedBlindPeering = sharedBlindPairing
 
         this.inboundInviteCodec = inboundCodec
         this.outboundInviteCodec = outboundCodec
@@ -162,12 +174,12 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         key: Uint8Array,
         count: number,
         expiresMillisSinceEpoch: number | null,
-        payload: OutboundAdditionalData,
+        additionalData: OutboundAdditionalData,
         additionalNodes?: Array<AddressInput>
     ): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
-        const additionalData = encode(this.outboundInviteCodec, payload)
+        const encodedAdditionalData = encode(this.outboundInviteCodec, additionalData)
 
-        const opts: any= { data: additionalData, additionalNodes: additionalNodes}
+        const opts: any= { data: encodedAdditionalData, additionalNodes: additionalNodes}
         if (expiresMillisSinceEpoch) opts.expires = expiresMillisSinceEpoch
 
         const invite = BlindPairing.createInvite(key, opts)
@@ -182,14 +194,14 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: expiresMillisSinceEpoch,
             additionalData:
-                payload !== null && payload !== undefined
+                additionalData !== null && additionalData !== undefined
                     ? {
-                          data: payload,
+                          data: additionalData,
                           // The signature should never be undefined if 'payload' is not null or undefined
                           signature: additionalDataSignature!,
                       }
                     : {
-                          data: payload,
+                          data: additionalData,
                           signature: null,
                       },
             invite: invite.invite,
@@ -240,7 +252,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         })
     }
 
-    public data(): IReadOnlyInviteDatabase<InboundAdditionalData, OutboundAdditionalData> {
+    public inviteData(): IReadOnlyInviteDatabase<InboundAdditionalData, OutboundAdditionalData> {
         return this.inviteDatabase;
     }
 

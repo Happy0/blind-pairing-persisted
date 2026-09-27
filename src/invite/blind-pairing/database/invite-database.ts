@@ -79,7 +79,7 @@ export class BTreeInviteDatabase<
     private privateHyperbee: Hyperbee
 
     /**
-     * @param privateHyperbee A hyperbee database to store the invite. This should not be replicated.
+     * @param privateHyperbee a Hyperbee for storing the invites in. This should not be replicated to keep the invites private.
      * @param purpose - the type of resource these invites are for - this is used to start a 'sub' database of the hyperbee
      * @param codec A codec for encoding / decoding the payloads sent on invite acceptances in each direction
      */

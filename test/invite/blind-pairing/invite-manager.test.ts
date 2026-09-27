@@ -46,7 +46,7 @@ describe('Invite Manager - end to end', () => {
                 'testAdditionalData'
             )
 
-            const dbEntry = await inviteManager.data().getInvite(invite.inviteId)
+            const dbEntry = await inviteManager.inviteData().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
         })
@@ -79,7 +79,7 @@ describe('Invite Manager - end to end', () => {
                     null,
                     'testAdditionalData'
                 )
-                const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
+                const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
 
                 expect(dbEntry).toBeDefined()
 
@@ -104,7 +104,7 @@ describe('Invite Manager - end to end', () => {
 
                 expect(received.payload).toStrictEqual('invitee_payload')
 
-                const newInviteState = await inviter.inviteManager.data().getInvite(
+                const newInviteState = await inviter.inviteManager.inviteData().getInvite(
                     invite.inviteId
                 )
 
@@ -139,7 +139,7 @@ describe('Invite Manager - end to end', () => {
                 null,
                 null
             )
-            const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -164,7 +164,7 @@ describe('Invite Manager - end to end', () => {
 
             expect(received.payload).toStrictEqual('invitee_payload')
 
-            const newInviteState = await inviter.inviteManager.data().getInvite(invite.inviteId)
+            const newInviteState = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
 
             if (expectOutboundInvite(newInviteState)) {
                 expect(newInviteState.remaining).toStrictEqual(0)
@@ -197,7 +197,7 @@ describe('Invite Manager - end to end', () => {
                 null,
                 undefined
             )
-            const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -222,7 +222,7 @@ describe('Invite Manager - end to end', () => {
 
             expect(received.payload).toStrictEqual('invitee_payload')
 
-            const newInviteState = await inviter.inviteManager.data().getInvite(invite.inviteId)
+            const newInviteState = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
 
             if (expectOutboundInvite(newInviteState)) {
                 expect(newInviteState.remaining).toStrictEqual(0)
@@ -279,7 +279,7 @@ describe('Invite Manager - end to end', () => {
                 'testaroonie'
             )
 
-            const dbEntry = await inviter.inviteManager.data().getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -318,7 +318,7 @@ describe('Invite Manager - end to end', () => {
             expect(inboundReceived.key).toStrictEqual(inviterCorestore.key)
             expect(inboundReceived.payload).toStrictEqual('testaroonie')
 
-            const newInviteState = await invitee.inviteManager.data().getInvite(invite.inviteId)
+            const newInviteState = await invitee.inviteManager.inviteData().getInvite(invite.inviteId)
 
             if (expectInboundInvite(newInviteState)) {
                 expect(newInviteState.status).toStrictEqual('complete')
@@ -340,6 +340,8 @@ describe('Invite Manager - end to end', () => {
         test('Deleting an inbound invite results in the blind pairing candidate being closed', () => {})
 
         test('Expired inbound invites are not added to blind pairing at invite manager load', () => {})
+
+        test('Expired outbound invites are not added to blind pairing at invite manager load', () => {})
     })
 
     function expectOutboundInvite<I, O>(
