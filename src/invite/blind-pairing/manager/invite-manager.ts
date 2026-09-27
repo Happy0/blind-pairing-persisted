@@ -1,5 +1,9 @@
 import ReadyResource from 'ready-resource'
-import { BTreeInviteDatabase, type IInviteDatabase, type IReadOnlyInviteDatabase } from '../database/invite-database.js'
+import {
+    BTreeInviteDatabase,
+    type IInviteDatabase,
+    type IReadOnlyInviteDatabase,
+} from '../database/invite-database.js'
 import type { InviteUpdateEvent } from './invite-update-event.js'
 import {
     type InternalOutboundInvite,
@@ -19,6 +23,10 @@ export type Invite = {
     purpose: string
 }
 
+/**
+ * @typeParam InboundAdditionalData - the type of the data the invitee sends the inviter when they accept an invite
+ * @typeParam OutboundAdditionalData the data, additional to the key, that the inviter sends to the invitee when confirming an invite acceptance
+ */
 export interface IInviteManager<InboundPayload, OutboundPayload> {
     createInvite(
         key: Uint8Array,
@@ -61,7 +69,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     >()
 
     /**
-     * 
+     *
      * @param sharedBlindPairing a 'shared blind pairing' instance that should be shared across different invite managers instantiated in the app
      * @param purpose A unique string per invite manager in the app describing what the invites are used for.
      * @param privateHyperbee a Hyperbee for storing the invites in. This should not be replicated to keep the invites private.
@@ -77,7 +85,12 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     ) {
         super()
         this.purpose = purpose
-        this.inviteDatabase = new BTreeInviteDatabase(privateHyperbee, purpose, inboundCodec, outboundCodec);
+        this.inviteDatabase = new BTreeInviteDatabase(
+            privateHyperbee,
+            purpose,
+            inboundCodec,
+            outboundCodec
+        )
 
         this.sharedBlindPeering = sharedBlindPairing
 
@@ -141,9 +154,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
                 inviteId,
                 async () => {
                     await this.inviteDatabase.deleteInvite(inviteId)
-                    await this.sharedBlindPeering.removeInboundInvite(
-                        inviteId
-                    )
+                    await this.sharedBlindPeering.removeInboundInvite(inviteId)
                 }
             )
         } else {
@@ -177,9 +188,15 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         additionalData: OutboundAdditionalData,
         additionalNodes?: Array<AddressInput>
     ): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
-        const encodedAdditionalData = encode(this.outboundInviteCodec, additionalData)
+        const encodedAdditionalData = encode(
+            this.outboundInviteCodec,
+            additionalData
+        )
 
-        const opts: any= { data: encodedAdditionalData, additionalNodes: additionalNodes}
+        const opts: any = {
+            data: encodedAdditionalData,
+            additionalNodes: additionalNodes,
+        }
         if (expiresMillisSinceEpoch) opts.expires = expiresMillisSinceEpoch
 
         const invite = BlindPairing.createInvite(key, opts)
@@ -252,8 +269,11 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         })
     }
 
-    public inviteData(): IReadOnlyInviteDatabase<InboundAdditionalData, OutboundAdditionalData> {
-        return this.inviteDatabase;
+    public inviteData(): IReadOnlyInviteDatabase<
+        InboundAdditionalData,
+        OutboundAdditionalData
+    > {
+        return this.inviteDatabase
     }
 
     private async acceptInvite(

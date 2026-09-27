@@ -1,5 +1,5 @@
 export * from './invite/blind-pairing/manager/invite-manager.js'
 export * from './invite/blind-pairing/manager/simple-invite-manager.js'
-export * from './invite/blind-pairing/database/invite-database.js' 
+export * from './invite/blind-pairing/database/invite-database.js'
 export * from './invite/blind-pairing/manager/shared-blind-pairing.js'
 export * from './invite/blind-pairing/database/model/invite-model.js'

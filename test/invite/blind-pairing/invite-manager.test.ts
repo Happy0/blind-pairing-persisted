@@ -14,7 +14,10 @@ import type {
 } from '../../../src/invite/blind-pairing/database/model/invite-model.js'
 import { randomBytes } from 'node:crypto'
 import { fail } from 'node:assert'
-import { nullCodec, undefinedCodec } from '../../../src/invite/blind-pairing/database/model/codecs.js'
+import {
+    nullCodec,
+    undefinedCodec,
+} from '../../../src/invite/blind-pairing/database/model/codecs.js'
 
 describe('Invite Manager - end to end', () => {
     const testDataDir = tmpdir() + path.sep + 'blind-pairing-tests'
@@ -46,7 +49,9 @@ describe('Invite Manager - end to end', () => {
                 'testAdditionalData'
             )
 
-            const dbEntry = await inviteManager.inviteData().getInvite(invite.inviteId)
+            const dbEntry = await inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
         })
@@ -79,7 +84,9 @@ describe('Invite Manager - end to end', () => {
                     null,
                     'testAdditionalData'
                 )
-                const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
+                const dbEntry = await inviter.inviteManager
+                    .inviteData()
+                    .getInvite(invite.inviteId)
 
                 expect(dbEntry).toBeDefined()
 
@@ -104,9 +111,9 @@ describe('Invite Manager - end to end', () => {
 
                 expect(received.payload).toStrictEqual('invitee_payload')
 
-                const newInviteState = await inviter.inviteManager.inviteData().getInvite(
-                    invite.inviteId
-                )
+                const newInviteState = await inviter.inviteManager
+                    .inviteData()
+                    .getInvite(invite.inviteId)
 
                 if (expectOutboundInvite(newInviteState)) {
                     expect(newInviteState.remaining).toStrictEqual(0)
@@ -139,7 +146,9 @@ describe('Invite Manager - end to end', () => {
                 null,
                 null
             )
-            const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -164,7 +173,9 @@ describe('Invite Manager - end to end', () => {
 
             expect(received.payload).toStrictEqual('invitee_payload')
 
-            const newInviteState = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
+            const newInviteState = await inviter.inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             if (expectOutboundInvite(newInviteState)) {
                 expect(newInviteState.remaining).toStrictEqual(0)
@@ -197,7 +208,9 @@ describe('Invite Manager - end to end', () => {
                 null,
                 undefined
             )
-            const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -222,11 +235,15 @@ describe('Invite Manager - end to end', () => {
 
             expect(received.payload).toStrictEqual('invitee_payload')
 
-            const newInviteState = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
+            const newInviteState = await inviter.inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             if (expectOutboundInvite(newInviteState)) {
                 expect(newInviteState.remaining).toStrictEqual(0)
-                expect(newInviteState.additionalData.data).toStrictEqual(undefined)
+                expect(newInviteState.additionalData.data).toStrictEqual(
+                    undefined
+                )
             }
         })
 
@@ -279,7 +296,9 @@ describe('Invite Manager - end to end', () => {
                 'testaroonie'
             )
 
-            const dbEntry = await inviter.inviteManager.inviteData().getInvite(invite.inviteId)
+            const dbEntry = await inviter.inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             expect(dbEntry).toBeDefined()
 
@@ -318,7 +337,9 @@ describe('Invite Manager - end to end', () => {
             expect(inboundReceived.key).toStrictEqual(inviterCorestore.key)
             expect(inboundReceived.payload).toStrictEqual('testaroonie')
 
-            const newInviteState = await invitee.inviteManager.inviteData().getInvite(invite.inviteId)
+            const newInviteState = await invitee.inviteManager
+                .inviteData()
+                .getInvite(invite.inviteId)
 
             if (expectInboundInvite(newInviteState)) {
                 expect(newInviteState.status).toStrictEqual('complete')
@@ -331,7 +352,9 @@ describe('Invite Manager - end to end', () => {
 
         test('Invite rejection triggers event', () => {})
 
-        test('Multiple invites with the same discovery key results in an error', () => {})
+        test('Multiple invites with the same discovery key results in the invite being queued', () => {})
+
+        test("When a invite is completed it is not added to the 'shared blind pairing' instance at startup", () => {})
     })
 
     describe('Lifecycle management', () => {

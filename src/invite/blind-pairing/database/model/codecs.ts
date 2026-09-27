@@ -9,11 +9,9 @@ export const nullCodec: Codec<null> = {
 }
 
 export const undefinedCodec: Codec<undefined> = {
-    preencode: function (state: State, value: undefined): void {
-    },
-    encode: function (state: State, value: undefined): void {
-    },
+    preencode: function (state: State, value: undefined): void {},
+    encode: function (state: State, value: undefined): void {},
     decode: function (state: State): undefined {
-        return undefined;
-    }
+        return undefined
+    },
 }
