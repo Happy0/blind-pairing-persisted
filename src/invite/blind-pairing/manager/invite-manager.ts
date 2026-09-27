@@ -142,45 +142,6 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         this.sharedBlindPeering.removeInboundHandlers(this.purpose)
     }
 
-    async deleteInvite(inviteId: string): Promise<void> {
-        const invite = await this.inviteDatabase.getInvite(inviteId)
-
-        if (!invite) {
-            return
-        }
-
-        if (invite.direction === 'inbound') {
-            await this.sequentialRunner.runSequentiallyPerId(
-                inviteId,
-                async () => {
-                    await this.inviteDatabase.deleteInvite(inviteId)
-                    await this.sharedBlindPeering.removeInboundInvite(inviteId)
-                }
-            )
-        } else {
-            const discoveryKeyHex = b4a.toString(invite.discoveryKey, 'hex')
-
-            // Sequence with the invite insert function
-            await this.sequentialRunner.runSequentiallyPerId(
-                discoveryKeyHex,
-                async () => {
-                    await this.inviteDatabase.deleteInvite(inviteId)
-                    const discoveryKeyInUse =
-                        await this.inviteDatabase.hasActiveOutboundInviteWithDiscoveryKey(
-                            invite.discoveryKey
-                        )
-
-                    if (!discoveryKeyInUse) {
-                        await this.sharedBlindPeering.removeOutboundInviteHandler(
-                            invite.discoveryKey,
-                            invite.purpose
-                        )
-                    }
-                }
-            )
-        }
-    }
-
     async createInvite(
         key: Uint8Array,
         count: number,
@@ -267,6 +228,45 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
             await this.inviteDatabase.upsertInbound(inboundInvite)
             await this.acceptInvite(inboundInvite, decodedInvite.discoveryKey)
         })
+    }
+
+     async deleteInvite(inviteId: string): Promise<void> {
+        const invite = await this.inviteDatabase.getInvite(inviteId)
+
+        if (!invite) {
+            return
+        }
+
+        if (invite.direction === 'inbound') {
+            await this.sequentialRunner.runSequentiallyPerId(
+                inviteId,
+                async () => {
+                    await this.inviteDatabase.deleteInvite(inviteId)
+                    await this.sharedBlindPeering.removeInboundInvite(inviteId)
+                }
+            )
+        } else {
+            const discoveryKeyHex = b4a.toString(invite.discoveryKey, 'hex')
+
+            // Sequence with the invite insert function
+            await this.sequentialRunner.runSequentiallyPerId(
+                discoveryKeyHex,
+                async () => {
+                    await this.inviteDatabase.deleteInvite(inviteId)
+                    const discoveryKeyInUse =
+                        await this.inviteDatabase.hasActiveOutboundInviteWithDiscoveryKey(
+                            invite.discoveryKey
+                        )
+
+                    if (!discoveryKeyInUse) {
+                        await this.sharedBlindPeering.removeOutboundInviteHandler(
+                            invite.discoveryKey,
+                            invite.purpose
+                        )
+                    }
+                }
+            )
+        }
     }
 
     public inviteData(): IReadOnlyInviteDatabase<
