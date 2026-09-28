@@ -264,7 +264,12 @@ describe('Invite Manager - end to end', () => {
 
             const databaseCorestoreName = randomBytes(10).toString('hex')
 
-            const { inviteManager } = await createTestDependencies(
+            const {
+                inviteManager,
+                hyperbee,
+                sharedBlindPairing: mbp,
+                blindPairing,
+            } = await createTestDependencies(
                 dhtBootstrap,
                 testCorestore,
                 'test',
@@ -273,11 +278,64 @@ describe('Invite Manager - end to end', () => {
                 databaseCorestoreName
             )
 
+            const inviteeDependencies = await createTestDependencies(
+                dhtBootstrap,
+                testCorestore,
+                'test',
+                string,
+                nullCodec,
+                randomBytes(10).toString('hex')
+            )
+
             const inviterKey = Buffer.alloc(32).fill('testaroonie')
 
-            // inviteManager.createInvite(inviterKey, {
+            const outboundInvite = await inviteManager.createInvite(
+                inviterKey,
+                {
+                    count: 1,
+                    additionalData: null,
+                    expiresMillisSinceEpoch: null,
+                }
+            )
 
-            // })
+            await inviteManager.close()
+            await hyperbee.close()
+            await mbp.close()
+            await blindPairing.close()
+
+            // Reload the test dependencies then redeem the invite
+            const reloadedTestDependencies = await createTestDependencies(
+                dhtBootstrap,
+                testCorestore,
+                'test',
+                string,
+                nullCodec,
+                databaseCorestoreName
+            )
+
+            const inviteAcceptedEmitted = new Promise<{invite: InternalOutboundInvite<null>, payload: string}>((resolve, reject) => {
+                reloadedTestDependencies.inviteManager.events.once(
+                    'inviteAccepted',
+                    (invite, payload) => {
+                        resolve({ invite, payload })
+                    }
+                )
+            })
+
+            await inviteeDependencies.inviteManager.useInvite(
+                {
+                    invite: outboundInvite.invite,
+                    purpose: outboundInvite.purpose,
+                },
+                'invitee_payload'
+            )
+
+            const event = await inviteAcceptedEmitted;
+
+            expect(event.invite.inviteId).toStrictEqual(outboundInvite.inviteId);
+            expect(event.payload).toStrictEqual('invitee_payload');
+
+            
         })
 
         test('Outbound invite is rejected if all invites have been used', () => {})

@@ -213,8 +213,13 @@ export class SharedBlindPairing extends ReadyResource {
             clearInterval(this.timerTask)
         }
 
-        // TODO (robust): do we need to close each member/candidate ourselves?
-        await this.blindPairing.close()
+        const closeMembersPromises = Object.values(this.outboundHandlers).map(handler => handler.member.close())
+        const closeCandidatesPromises = Object.values(this.inboundHandlers).map(handler => handler.current.candidate.close())
+
+        this.outboundHandlers = {};
+        this.inboundHandlers = {};
+
+        await Promise.all([...closeMembersPromises, ...closeCandidatesPromises]);
     }
 
     private startCleanupTimerTask(): NodeJS.Timeout {
