@@ -370,7 +370,7 @@ export class SharedBlindPairing extends ReadyResource {
             .then(async (result: any) => {
                 const decodedData = decode(
                     inboundHandlerOpts.outboundCodec,
-                    result.data
+                    result.data || Buffer.from([])
                 )
 
                 inboundHandlerOpts.invite.status = 'complete'

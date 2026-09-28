@@ -7,7 +7,7 @@ import Hyperbee from 'hyperbee'
 import { randomBytes } from 'node:crypto'
 import createTestnet from 'hyperdht/testnet.js'
 import BlindPairing from 'blind-pairing'
-import { BTreeInviteDatabase } from '../src/index.js'
+import { BTreeInviteDatabase, type IInviteDatabase } from '../src/index.js'
 
 export async function getTestnetHyperswarm(): Promise<Array<BootstrapNode>> {
     const testnet = await createTestnet(10)
@@ -27,6 +27,7 @@ export async function createTestDependencies<Inbound, Outbound>(
     inviteManager: InviteManager<Inbound, Outbound>
     sharedBlindPairing: SharedBlindPairing,
     hyperbee: Hyperbee,
+    inviteDatabase: IInviteDatabase<Inbound, Outbound>,
     blindPairing: BlindPairing
 }> {
     const blindPairing = new BlindPairing(new Hyperswarm({ bootstrap: bootstrap }));
@@ -34,7 +35,6 @@ export async function createTestDependencies<Inbound, Outbound>(
     const sharedBlindPairing = new SharedBlindPairing(
         blindPairing
     )
-
 
     await corestore.ready()
     const hypercore = corestore.get({ name: inviteDbHypercoreName })
@@ -56,9 +56,7 @@ export async function createTestDependencies<Inbound, Outbound>(
         outboundCodec
     )
 
-    await inviteManager.ready();
-
-    return { inviteManager, sharedBlindPairing: sharedBlindPairing, hyperbee, blindPairing: blindPairing }
+    return { inviteManager, sharedBlindPairing: sharedBlindPairing, hyperbee, blindPairing: blindPairing, inviteDatabase: inviteDatabase }
 }
 
 export async function createInviteManagers<Inbound, Outbound>(
