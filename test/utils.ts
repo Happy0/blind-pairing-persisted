@@ -7,6 +7,7 @@ import Hyperbee from 'hyperbee'
 import { randomBytes } from 'node:crypto'
 import createTestnet from 'hyperdht/testnet.js'
 import BlindPairing from 'blind-pairing'
+import { BTreeInviteDatabase } from '../src/index.js'
 
 export async function getTestnetHyperswarm(): Promise<Array<BootstrapNode>> {
     const testnet = await createTestnet(10)
@@ -20,7 +21,8 @@ export async function createTestDependencies<Inbound, Outbound>(
     corestore: Corestore,
     purpose: string,
     inboundCodec: Codec<Inbound>,
-    outboundCodec: Codec<Outbound>
+    outboundCodec: Codec<Outbound>,
+    hypercoreName: string
 ): Promise<{
     inviteManager: InviteManager<Inbound, Outbound>
     mbp: SharedBlindPairing
@@ -29,10 +31,8 @@ export async function createTestDependencies<Inbound, Outbound>(
         new BlindPairing(new Hyperswarm({ bootstrap: bootstrap }))
     )
 
-    const randomCoreName = randomBytes(20).toString('hex')
-
     await corestore.ready()
-    const hypercore = corestore.get({ name: randomCoreName })
+    const hypercore = corestore.get({ name: hypercoreName })
     await hypercore.ready()
 
     const hyperbee: Hyperbee = new Hyperbee(hypercore as any, {
@@ -41,10 +41,12 @@ export async function createTestDependencies<Inbound, Outbound>(
     })
     await hyperbee.ready()
 
+    const inviteDatabase = new BTreeInviteDatabase<Inbound, Outbound>(hyperbee, purpose, inboundCodec, outboundCodec);
+
     const inviteManager = new InviteManager<Inbound, Outbound>(
         mbp,
         purpose,
-        hyperbee,
+        inviteDatabase,
         inboundCodec,
         outboundCodec
     )
@@ -64,14 +66,16 @@ export async function createInviteManagers<Inbound, Outbound>(
         corestore,
         purpose,
         inboundCodec,
-        outboundCodec
+        outboundCodec,
+        randomBytes(20).toString('hex')
     )
     const outbound = await createTestDependencies(
         bootstrap,
         corestore,
         purpose,
         inboundCodec,
-        outboundCodec
+        outboundCodec,
+        randomBytes(20).toString('hex')
     )
 
     await inbound.inviteManager.ready()

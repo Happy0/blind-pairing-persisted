@@ -1,6 +1,7 @@
 import { expect, test, describe } from 'vitest'
 import {
     createTestDependencies as createFreshTestDependencies,
+    createTestDependencies,
     createInviteManagers as createTestInviteManagers,
     getTestnetHyperswarm as getTestnetBootstrap,
 } from '../../utils.js'
@@ -31,7 +32,8 @@ describe('Invite Manager - end to end', () => {
                 testCorestore,
                 'test',
                 string,
-                string
+                string,
+                randomBytes(10).toString('hex')
             )
 
             const inviterCorestore = await testCorestore
@@ -44,9 +46,11 @@ describe('Invite Manager - end to end', () => {
 
             const invite = await inviteManager.createInvite(
                 inviterCorestore.key,
-                1,
-                null,
-                'testAdditionalData'
+                {
+                    count: 1,
+                    expiresMillisSinceEpoch: null,
+                    additionalData: 'testAdditionalData',
+                }
             )
 
             const dbEntry = await inviteManager
@@ -80,9 +84,11 @@ describe('Invite Manager - end to end', () => {
 
                 const invite = await inviter.inviteManager.createInvite(
                     inviterCorestore.key,
-                    1,
-                    null,
-                    'testAdditionalData'
+                    {
+                        count: 1,
+                        expiresMillisSinceEpoch: null,
+                        additionalData: 'testAdditionalData',
+                    }
                 )
                 const dbEntry = await inviter.inviteManager
                     .inviteData()
@@ -142,9 +148,11 @@ describe('Invite Manager - end to end', () => {
 
             const invite = await inviter.inviteManager.createInvite(
                 inviterCorestore.key,
-                1,
-                null,
-                null
+                {
+                    count: 1,
+                    expiresMillisSinceEpoch: null,
+                    additionalData: null,
+                }
             )
             const dbEntry = await inviter.inviteManager
                 .inviteData()
@@ -204,9 +212,11 @@ describe('Invite Manager - end to end', () => {
 
             const invite = await inviter.inviteManager.createInvite(
                 inviterCorestore.key,
-                1,
-                null,
-                undefined
+                {
+                    count: 1,
+                    expiresMillisSinceEpoch: null,
+                    additionalData: undefined,
+                }
             )
             const dbEntry = await inviter.inviteManager
                 .inviteData()
@@ -249,7 +259,26 @@ describe('Invite Manager - end to end', () => {
 
         test('Additional nodes added to invite', () => {})
 
-        test('Outbound invite re-loaded from storage can be redeemed as expected', () => {})
+        test('Outbound invite re-loaded from storage can be redeemed as expected', async () => {
+            const dhtBootstrap = await getTestnetBootstrap()
+
+            const databaseCorestoreName = randomBytes(10).toString('hex')
+
+            const { inviteManager } = await createTestDependencies(
+                dhtBootstrap,
+                testCorestore,
+                'test',
+                string,
+                nullCodec,
+                databaseCorestoreName
+            )
+
+            const inviterKey = Buffer.alloc(32).fill('testaroonie')
+
+            // inviteManager.createInvite(inviterKey, {
+
+            // })
+        })
 
         test('Outbound invite is rejected if all invites have been used', () => {})
 
@@ -291,9 +320,11 @@ describe('Invite Manager - end to end', () => {
 
             const invite = await inviter.inviteManager.createInvite(
                 inviterCorestore.key,
-                1,
-                null,
-                'testaroonie'
+                {
+                    count: 1,
+                    expiresMillisSinceEpoch: null,
+                    additionalData: 'testaroonie',
+                }
             )
 
             const dbEntry = await inviter.inviteManager
