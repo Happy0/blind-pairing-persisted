@@ -1,24 +1,26 @@
 {
-    "name": "blind-pairing-persisted",
+    "name": "@happy0/blind-pairing-persisted",
     "version": "0.0.1-beta",
     "description": "",
+    "homepage": "https://github.com/happy0/blind-pairing-persisted#readme",
+    "bugs": {
+        "url": "https://github.com/happy0/blind-pairing-persisted/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/happy0/blind-pairing-persisted.git"
+    },
     "license": "MIT",
     "author": "happy0",
     "type": "module",
     "main": "dist/src/index.js",
     "types": "dist/src/index.d.ts",
+    "directories": {
+        "test": "test"
+    },
     "scripts": {
         "test": "vitest",
         "prettier": "prettier . --write"
-    },
-    "devDependencies": {
-        "@types/node": "^26.5.1",
-        "eslint": "^10.10.0",
-        "holepunch-types": "^0.2.1",
-        "prettier": "^3.9.9",
-        "ts-node": "^10.9.2",
-        "typescript": "^7.0.2",
-        "vitest": "^5.0.1"
     },
     "dependencies": {
         "async-mutex": "^0.5.0",
@@ -30,5 +32,14 @@
         "hyperswarm": "^4.17.1",
         "ready-resource": "^1.2.0",
         "tseep": "^1.3.1"
+    },
+    "devDependencies": {
+        "@types/node": "^26.5.1",
+        "eslint": "^10.10.0",
+        "holepunch-types": "^0.2.1",
+        "prettier": "^3.9.9",
+        "ts-node": "^10.9.2",
+        "typescript": "^7.0.2",
+        "vitest": "^5.0.1"
     }
 }
