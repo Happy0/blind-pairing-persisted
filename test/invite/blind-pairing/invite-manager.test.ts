@@ -444,95 +444,103 @@ describe('Invite Manager - end to end', () => {
             expect(outboundReceived.payload).toStrictEqual(inviteeCorestore.key)
         })
 
-        test('Inbound invite reloaded from storage on startup can be redeemed', {timeout: 120000}, async () => {
-            const dhtBootstrap = await getTestnetBootstrap()
+        test(
+            'Inbound invite reloaded from storage on startup can be redeemed',
+            { timeout: 120000 },
+            async () => {
+                const dhtBootstrap = await getTestnetBootstrap()
 
-            const inviteeDatabaseCorestoreName = randomBytes(10).toString('hex')
+                const inviteeDatabaseCorestoreName =
+                    randomBytes(10).toString('hex')
 
-            const {
-                inviteManager,
-                hyperbee,
-                sharedBlindPairing: mbp,
-                blindPairing,
-            } = await createTestDependencies<string, null>(
-                dhtBootstrap,
-                testCorestore,
-                'test',
-                string,
-                nullCodec,
-                randomBytes(10).toString('hex')
-            )
+                const {
+                    inviteManager,
+                    hyperbee,
+                    sharedBlindPairing: mbp,
+                    blindPairing,
+                } = await createTestDependencies<string, null>(
+                    dhtBootstrap,
+                    testCorestore,
+                    'test',
+                    string,
+                    nullCodec,
+                    randomBytes(10).toString('hex')
+                )
 
-            await inviteManager.ready()
+                await inviteManager.ready()
 
-            const inviterKey = Buffer.alloc(32).fill('testaroonie')
+                const inviterKey = Buffer.alloc(32).fill('testaroonie')
 
-            const outboundInvite = await inviteManager.createInvite(
-                inviterKey,
-                {
-                    count: 1,
-                    additionalData: null,
-                    expiresMillisSinceEpoch: null,
-                }
-            )
-
-            const inviteeDbCore = await testCorestore.get({
-                name: inviteeDatabaseCorestoreName,
-            })
-            await inviteeDbCore
-            const inviteeDbBee = new Hyperbee(inviteeDbCore as any)
-            await inviteeDbBee
-
-            const inviteeInviteDb = new BTreeInviteDatabase<string, null>(
-                inviteeDbBee,
-                outboundInvite.purpose,
-                string,
-                nullCodec
-            )
-
-            // Insert the invite in the database ahead of loading the invite manager
-            await inviteeInviteDb.upsertInbound({
-                invite: outboundInvite.invite,
-                createdAtMillisSinceEpoch: Date.now(),
-                direction: 'inbound',
-                expiresMillisSinceEpoch: outboundInvite.expiresMillisSinceEpoch,
-                inviteId: outboundInvite.inviteId,
-                payload: 'invitee_test',
-                purpose: outboundInvite.purpose,
-                status: 'pending',
-            })
-
-            await inviteeDbBee.close()
-            await inviteeDbCore.close()
-
-            const inviteeDependencies = await createTestDependencies(
-                dhtBootstrap,
-                testCorestore,
-                'test',
-                string,
-                nullCodec,
-                inviteeDatabaseCorestoreName
-            )
-
-            const result = new Promise<{
-                invite: InternalInboundInvite<string>,
-                key: Uint8Array,
-                payload: null
-            }>((resolve, reject) => {
-                inviteeDependencies.inviteManager.events.once(
-                    'inviteConfirmed',
-                    (invite, key, payload) => {
-                        resolve({invite, key, payload})
+                const outboundInvite = await inviteManager.createInvite(
+                    inviterKey,
+                    {
+                        count: 1,
+                        additionalData: null,
+                        expiresMillisSinceEpoch: null,
                     }
                 )
-            })
 
-            await inviteeDependencies.inviteManager.ready();
+                const inviteeDbCore = await testCorestore.get({
+                    name: inviteeDatabaseCorestoreName,
+                })
+                await inviteeDbCore
+                const inviteeDbBee = new Hyperbee(inviteeDbCore as any)
+                await inviteeDbBee
 
-            const inviteConfirmationDetails = await result
+                const inviteeInviteDb = new BTreeInviteDatabase<string, null>(
+                    inviteeDbBee,
+                    outboundInvite.purpose,
+                    string,
+                    nullCodec
+                )
 
-            expect(inviteConfirmationDetails.invite.inviteId).toStrictEqual(outboundInvite.inviteId)
-        })
+                // Insert the invite in the database ahead of loading the invite manager
+                await inviteeInviteDb.upsertInbound({
+                    invite: outboundInvite.invite,
+                    createdAtMillisSinceEpoch: Date.now(),
+                    direction: 'inbound',
+                    expiresMillisSinceEpoch:
+                        outboundInvite.expiresMillisSinceEpoch,
+                    inviteId: outboundInvite.inviteId,
+                    payload: 'invitee_test',
+                    purpose: outboundInvite.purpose,
+                    status: 'pending',
+                })
+
+                await inviteeDbBee.close()
+                await inviteeDbCore.close()
+
+                const inviteeDependencies = await createTestDependencies(
+                    dhtBootstrap,
+                    testCorestore,
+                    'test',
+                    string,
+                    nullCodec,
+                    inviteeDatabaseCorestoreName
+                )
+
+                const result = new Promise<{
+                    invite: InternalInboundInvite<string>
+                    key: Uint8Array
+                    payload: null
+                }>((resolve, reject) => {
+                    inviteeDependencies.inviteManager.events.once(
+                        'inviteConfirmed',
+                        (invite, key, payload) => {
+                            resolve({ invite, key, payload })
+                        }
+                    )
+                })
+
+                await inviteeDependencies.inviteManager.ready()
+
+                const inviteConfirmationDetails = await result
+
+                expect(inviteConfirmationDetails.invite.inviteId).toStrictEqual(
+                    outboundInvite.inviteId
+                )
+            }
+        )
 
         test('Invite rejection triggers event', () => {})
 

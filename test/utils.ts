@@ -25,16 +25,16 @@ export async function createTestDependencies<Inbound, Outbound>(
     inviteDbHypercoreName: string
 ): Promise<{
     inviteManager: InviteManager<Inbound, Outbound>
-    sharedBlindPairing: SharedBlindPairing,
-    hyperbee: Hyperbee,
-    inviteDatabase: IInviteDatabase<Inbound, Outbound>,
+    sharedBlindPairing: SharedBlindPairing
+    hyperbee: Hyperbee
+    inviteDatabase: IInviteDatabase<Inbound, Outbound>
     blindPairing: BlindPairing
 }> {
-    const blindPairing = new BlindPairing(new Hyperswarm({ bootstrap: bootstrap }));
-
-    const sharedBlindPairing = new SharedBlindPairing(
-        blindPairing
+    const blindPairing = new BlindPairing(
+        new Hyperswarm({ bootstrap: bootstrap })
     )
+
+    const sharedBlindPairing = new SharedBlindPairing(blindPairing)
 
     await corestore.ready()
     const hypercore = corestore.get({ name: inviteDbHypercoreName })
@@ -46,7 +46,12 @@ export async function createTestDependencies<Inbound, Outbound>(
     })
     await hyperbee.ready()
 
-    const inviteDatabase = new BTreeInviteDatabase<Inbound, Outbound>(hyperbee, purpose, inboundCodec, outboundCodec);
+    const inviteDatabase = new BTreeInviteDatabase<Inbound, Outbound>(
+        hyperbee,
+        purpose,
+        inboundCodec,
+        outboundCodec
+    )
 
     const inviteManager = new InviteManager<Inbound, Outbound>(
         sharedBlindPairing,
@@ -56,7 +61,13 @@ export async function createTestDependencies<Inbound, Outbound>(
         outboundCodec
     )
 
-    return { inviteManager, sharedBlindPairing: sharedBlindPairing, hyperbee, blindPairing: blindPairing, inviteDatabase: inviteDatabase }
+    return {
+        inviteManager,
+        sharedBlindPairing: sharedBlindPairing,
+        hyperbee,
+        blindPairing: blindPairing,
+        inviteDatabase: inviteDatabase,
+    }
 }
 
 export async function createInviteManagers<Inbound, Outbound>(

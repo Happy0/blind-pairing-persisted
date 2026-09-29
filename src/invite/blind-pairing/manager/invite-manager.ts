@@ -29,9 +29,9 @@ export interface IInviteManager<InboundPayload, OutboundPayload> {
     createInvite(
         key: Uint8Array,
         opts: {
-            count: number,
-            expiresMillisSinceEpoch: number | null,
-            additionalData: OutboundPayload,
+            count: number
+            expiresMillisSinceEpoch: number | null
+            additionalData: OutboundPayload
             additionalNodes?: Array<AddressInput>
         }
     ): Promise<Invite>
@@ -80,13 +80,16 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     constructor(
         sharedBlindPairing: SharedBlindPairing,
         purpose: string,
-        inviteDatastore: IInviteDatabase<InboundAdditionalData, OutboundAdditionalData>,
+        inviteDatastore: IInviteDatabase<
+            InboundAdditionalData,
+            OutboundAdditionalData
+        >,
         inboundCodec: Codec<InboundAdditionalData>,
         outboundCodec: Codec<OutboundAdditionalData>
     ) {
         super()
         this.purpose = purpose
-        this.inviteDatastore = inviteDatastore;
+        this.inviteDatastore = inviteDatastore
 
         this.sharedBlindPeering = sharedBlindPairing
 
@@ -141,9 +144,9 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
     async createInvite(
         key: Uint8Array,
         opts: {
-            count: number,
-            expiresMillisSinceEpoch: number | null,
-            additionalData: OutboundAdditionalData,
+            count: number
+            expiresMillisSinceEpoch: number | null
+            additionalData: OutboundAdditionalData
             additionalNodes?: Array<AddressInput>
         }
     ): Promise<InternalOutboundInvite<OutboundAdditionalData>> {
@@ -156,7 +159,8 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
             data: encodedAdditionalData,
             additionalNodes: opts.additionalNodes,
         }
-        if (opts.expiresMillisSinceEpoch) inviteOpts.expires = opts.expiresMillisSinceEpoch
+        if (opts.expiresMillisSinceEpoch)
+            inviteOpts.expires = opts.expiresMillisSinceEpoch
 
         const invite = BlindPairing.createInvite(key, inviteOpts)
         const inviteId = b4a.toString(invite.id, 'hex')
@@ -170,7 +174,8 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
             discoveryKey: invite.discoveryKey,
             expiresMillisSinceEpoch: opts.expiresMillisSinceEpoch,
             additionalData:
-                opts.additionalData !== null && opts.additionalData !== undefined
+                opts.additionalData !== null &&
+                opts.additionalData !== undefined
                     ? {
                           data: opts.additionalData,
                           // The signature should never be undefined if 'payload' is not null or undefined
@@ -228,7 +233,7 @@ export class InviteManager<InboundAdditionalData, OutboundAdditionalData>
         })
     }
 
-     async deleteInvite(inviteId: string): Promise<void> {
+    async deleteInvite(inviteId: string): Promise<void> {
         const invite = await this.inviteDatastore.getInvite(inviteId)
 
         if (!invite) {

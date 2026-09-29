@@ -3,6 +3,7 @@ import { InviteManager } from './invite-manager.js'
 import type { SharedBlindPairing } from './shared-blind-pairing.js'
 import { nullCodec } from '../database/model/codecs.js'
 import { fixed32 } from 'compact-encoding/index.js'
+import type { IInviteDatabase } from '../database/invite-datastore.js'
 
 /**
  * A version of 'InviteManager' where the invite has no 'additional data' (only a key),
@@ -11,9 +12,9 @@ import { fixed32 } from 'compact-encoding/index.js'
 export class SimpleInviteManager extends InviteManager<Uint8Array, null> {
     constructor(
         sharedBlindPeering: SharedBlindPairing,
-        privateHyperbee: Hyperbee,
+        inviteDatastore: IInviteDatabase<Uint8Array, null>,
         purpose: string
     ) {
-        super(sharedBlindPeering, purpose, privateHyperbee, fixed32, nullCodec)
+        super(sharedBlindPeering, purpose, inviteDatastore, fixed32, nullCodec)
     }
 }
