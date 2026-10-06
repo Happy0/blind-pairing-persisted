@@ -1,4 +1,4 @@
-import type { Codec } from 'compact-encoding'
+import { fixed32, type Codec } from 'compact-encoding'
 import { encode, decode, string } from 'compact-encoding/index.js'
 import {
     type InternalOutboundInvite,
@@ -10,6 +10,7 @@ import {
 import Hyperbee from 'hyperbee'
 import { type DiscoveryKeyUsages } from './model/discovery-key-usage-model.js'
 import b4a from 'b4a'
+import { nullCodec } from './model/codecs.js'
 
 export interface IReadOnlyInviteDatabase<
     InboundAdditionalData,
@@ -344,6 +345,16 @@ export class BTreeInviteDatabase<
                 yield item
             }
         }
+    }
+}
+
+export class SimpleBTreeInviteDatabase extends BTreeInviteDatabase<Uint8Array, null> {
+
+    constructor(
+        privateHyperbee: Hyperbee,
+        purpose: string
+    ) {
+        super(privateHyperbee, purpose, fixed32, nullCodec)
     }
 }
 

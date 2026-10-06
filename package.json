@@ -1,6 +1,6 @@
 {
     "name": "@happy0/blind-pairing-persisted",
-    "version": "0.0.1-beta",
+    "version": "0.0.2-beta",
     "description": "",
     "homepage": "https://github.com/happy0/blind-pairing-persisted#readme",
     "bugs": {
@@ -20,7 +20,8 @@
     },
     "scripts": {
         "test": "vitest",
-        "prettier": "prettier . --write"
+        "prettier": "prettier . --write",
+        "build": "tsc"
     },
     "dependencies": {
         "async-mutex": "^0.5.0",
